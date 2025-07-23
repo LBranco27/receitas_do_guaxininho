@@ -22,6 +22,12 @@ A motivação para desenvolver este app de receitas é oferecer uma solução si
 
 ---
 
+## 🎬 Apresentação
+
+📎 Link para a apresentação: **https://youtu.be/HK26VZ7ps2Y**
+
+---
+
 ## 📄 Descrição do Aplicativo
 
 O aplicativo tem como objetivo oferecer aos usuários uma maneira prática e organizada de encontrar receitas culinárias para o dia a dia. Com uma interface intuitiva e visualmente atrativa, permite:
