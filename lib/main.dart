@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'core/app_theme.dart';
 import 'data/datasources/recipe_local_datasource.dart';
@@ -12,6 +13,9 @@ import 'features/recipes/viewmodel/home_viewmodel.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
 
   await RecipeLocalDataSource().seedIfEmpty();
 
@@ -55,10 +59,43 @@ class RecipesApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Receitas',
+      title: 'Receitas do Guaxinim',
       theme: appTheme(),
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
     );
   }
 }
+
+//class MyHomePage extends StatefulWidget {
+//  const MyHomePage({super.key, required this.title});
+//
+//  final String title;
+//
+//  @override
+//  State<MyHomePage> createState() => _MyHomePageState();
+//}
+//
+//class _MyHomePageState extends State<MyHomePage> {
+//  void _navigateToRecipePage(BuildContext context) {
+//    Navigator.push(
+//      context,
+//      MaterialPageRoute(
+//        builder: (context) => const RecipePage(
+//          title: "Martini de Morango",
+//          imagePath: "assets/images/martini_de_morango.png",
+//          time: "5 min",
+//          servings: "1 pessoa",
+//          ingredients: {
+//            "Martini": "200ml de martini de preferência",
+//            "Morango": "100g de morangos selecionados à mão por himalios",
+//          },
+//          preparationSteps: [
+//            "Esmague os morangos com suas mãos.",
+//            "Coloque os morangos totalmente esmagados em um recipiente (podendo ser uma taça).",
+//            "Adicione o martini e misture a bebida com sua mão (esmague pedaços grandes de morango se precisar).",
+//          ],
+//        ),
+//      ),
+//    );
+//  }
