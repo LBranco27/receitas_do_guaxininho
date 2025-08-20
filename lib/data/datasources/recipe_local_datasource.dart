@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart'; // Import for debugPrint
 import 'package:sqflite/sqflite.dart';
 import '../../domain/entities/recipe.dart';
 import '../db/app_database.dart';
@@ -25,7 +26,25 @@ class RecipeLocalDataSource {
       whereArgs: args.isEmpty ? null : args,
       orderBy: 'id DESC',
     );
-    return maps.map((e) => Recipe.fromMap(e)).toList();
+    
+    return maps.map((e) {
+      if (kDebugMode) {
+        print('[RAW MAP] id: ${e['id']}, name: ${e['name']}, ingredients: ${e['ingredients']}');
+      }
+      try {
+        final recipe = Recipe.fromMap(e);
+        if (kDebugMode) {
+          print('[PARSED RECIPE] $recipe');
+        }
+        return recipe;
+      } catch (ex, stackTrace) {
+        if (kDebugMode) {
+          print('[RecipeLocalDataSource.getAll Error] Failed to parse recipe with id ${e['id']}: $ex');
+          print('[RecipeLocalDataSource.getAll StackTrace] $stackTrace');
+        }
+        return Recipe(name: 'Error Recipe', description: '', ingredients: {"Erro":["Falha ao carregar receita com ID ${e['id']}"]}, steps: [], category: '', timeMinutes: 0, servings: 0, id: (e['id'] as int?) ?? 0);
+      }
+    }).toList();
   }
 
   Future<List<String>> getCategories() async {
@@ -38,7 +57,14 @@ class RecipeLocalDataSource {
     final db = await _db;
     final maps = await db.query('recipes', where: 'id = ?', whereArgs: [id]);
     if (maps.isEmpty) return null;
-    return Recipe.fromMap(maps.first);
+    try {
+      return Recipe.fromMap(maps.first);
+    } catch (e) {
+       if (kDebugMode) {
+        print('[RecipeLocalDataSource.getById Error] Failed to parse recipe with id $id: $e');
+      }
+      return null;
+    }
   }
 
   Future<int> insert(Recipe recipe) async {
@@ -52,7 +78,6 @@ class RecipeLocalDataSource {
         where: 'id = ?', whereArgs: [id]);
   }
 
-  // (opcional V2)
   Future<void> update(Recipe r) async {
     final db = await _db;
     await db.update('recipes', r.toMap(), where: 'id = ?', whereArgs: [r.id]);
@@ -63,7 +88,6 @@ class RecipeLocalDataSource {
     await db.delete('recipes', where: 'id = ?', whereArgs: [id]);
   }
 
-  // seed inicial para brincar
   Future<void> seedIfEmpty() async {
     final db = await _db;
     final count = Sqflite.firstIntValue(
@@ -71,16 +95,14 @@ class RecipeLocalDataSource {
     )!;
     if (count > 0) return;
 
-    final demo = Recipe(
-      name: 'Salada verde com frango',
+    final demo1 = Recipe(
+      name: 'Salada azul com frango',
       description: 'Refrescante e rápida para o dia a dia.',
-      ingredients: [
-        '1 alface romana',
-        '250 g de peito de frango',
-        'Croutons',
-        'Parmesão a gosto',
-        'Sal, pimenta e azeite',
-      ],
+      ingredients: {
+        "Proteína": ["250 g de peito de frango"],
+        "Salada Base": ["1 alface romana", "Croutons a gosto"],
+        "Tempero": ["Sal a gosto", "Pimenta a gosto", "Azeite a gosto", "Parmesão a gosto"]
+      },
       steps: [
         'Grelhe o frango e fatie.',
         'Lave e quebre a alface.',
@@ -92,7 +114,25 @@ class RecipeLocalDataSource {
       servings: 3,
       imagePath: null,
     );
+    final demo2 = Recipe(
+      name: 'Martini de Morango',
+      description: 'Refrescante e rápida para o dia a dia.',
+      ingredients: {
+        "Bebida": ["200ml de martini de preferência"],
+        "Fruta": ["100g de morangos selecionados à mão por himalios"]
+      },
+      steps: [
+        "Esmague os morangos com suas mãos.",
+        "Coloque os morangos totalmente esmagados em um recipiente (podendo ser uma taça).",
+        "Adicione o martini e misture a bebida com sua mão (esmague pedaços grandes de morango se precisar).",
+      ],
+      category: 'Saladas', // Originalmente estava Saladas, mantendo consistência.
+      timeMinutes: 5,
+      servings: 1,
+      imagePath: "assets/images/martini_de_morango.png",
+    );
 
-    await insert(demo);
+    await insert(demo2);
+    await insert(demo1);
   }
 }

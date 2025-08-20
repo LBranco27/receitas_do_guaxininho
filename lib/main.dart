@@ -66,36 +66,3 @@ class RecipesApp extends StatelessWidget {
     );
   }
 }
-
-//class MyHomePage extends StatefulWidget {
-//  const MyHomePage({super.key, required this.title});
-//
-//  final String title;
-//
-//  @override
-//  State<MyHomePage> createState() => _MyHomePageState();
-//}
-//
-//class _MyHomePageState extends State<MyHomePage> {
-//  void _navigateToRecipePage(BuildContext context) {
-//    Navigator.push(
-//      context,
-//      MaterialPageRoute(
-//        builder: (context) => const RecipePage(
-//          title: "Martini de Morango",
-//          imagePath: "assets/images/martini_de_morango.png",
-//          time: "5 min",
-//          servings: "1 pessoa",
-//          ingredients: {
-//            "Martini": "200ml de martini de preferência",
-//            "Morango": "100g de morangos selecionados à mão por himalios",
-//          },
-//          preparationSteps: [
-//            "Esmague os morangos com suas mãos.",
-//            "Coloque os morangos totalmente esmagados em um recipiente (podendo ser uma taça).",
-//            "Adicione o martini e misture a bebida com sua mão (esmague pedaços grandes de morango se precisar).",
-//          ],
-//        ),
-//      ),
-//    );
-//  }

@@ -9,8 +9,14 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(homeVmProvider);
     final vm = ref.read(homeVmProvider.notifier);
+    // Call refresh when the widget is built to ensure data is fresh.
+    // Consider if this should be more targeted based on lifecycle events or specific actions.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      vm.refresh();
+    });
+
+    final state = ref.watch(homeVmProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -36,7 +42,7 @@ class HomePage extends ConsumerWidget {
             ),
           ),
           FutureBuilder<List<String>>(
-            future: ref.read(recipeRepositoryProvider).getCategories(),
+            future: ref.read(recipeRepositoryProvider).getCategories(), // Assuming recipeRepositoryProvider is accessible
             builder: (context, snap) {
               final cats = ['Todas', ...?snap.data];
               return SizedBox(
