@@ -1,29 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+//import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_theme.dart';
-import 'data/datasources/recipe_local_datasource.dart';
+//import 'data/datasources/recipe_local_datasource.dart';
+import 'data/datasources/recipe_remote_datasource.dart';
 import 'data/repositories/recipe_repository_impl.dart';
 import 'features/recipes/view/create_recipe_page.dart';
 import 'features/recipes/view/home_page.dart';
 import 'features/recipes/view/recipe_detail_page.dart';
 import 'features/recipes/viewmodel/home_viewmodel.dart';
 
+const supabaseUrl = 'https://sgyzhbcauskbaknoimtu.supabase.co';
+const supabaseKey = String.fromEnvironment('SUPABASE_KEY');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  sqfliteFfiInit();
-  databaseFactory = databaseFactoryFfi;
+  //sqfliteFfiInit();
+  //databaseFactory = databaseFactoryFfi;
 
-  await RecipeLocalDataSource().seedIfEmpty();
+  // using supabase instead of local sqlite
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseKey,
+  );
+
+//  await RecipeRemoteDataSource().seedIfEmpty();
 
   runApp(
     ProviderScope(
       overrides: [
         recipeRepositoryProvider.overrideWith(
-              (ref) => RecipeRepositoryImpl(RecipeLocalDataSource()),
+              //(ref) => RecipeRepositoryImpl(RecipeLocalDataSource()),
+              (ref) => RecipeRepositoryImpl(RecipeRemoteDataSource()),
         ),
       ],
       child: const RecipesApp(),

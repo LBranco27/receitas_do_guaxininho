@@ -10,6 +10,15 @@ Projeto desenvolvido por Pedro Caetano, Lucas Branco e João Guilherme Benjamin,
 
 ---
 
+## Installation
+
+1. Create a .env file on repository's root directory.
+2. Add SUPABASE_KEY environment variable.
+3. Run `flutter pub get` to install dependencies.
+4. Run `flutter run` to start the app.
+
+---
+
 ## 🧠 Motivação
 
 A motivação para desenvolver este app de receitas é oferecer uma solução simples, acessível e organizada para quem busca cozinhar em casa, com foco em uma experiência intuitiva e leve. Seu diferencial está na interface minimalista e funcional, que permite encontrar, salvar e gerenciar receitas favoritas de forma rápida, sem distrações ou excesso de informações.

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:postgrest/src/types.dart';
 
 class Recipe {
   final int? id;
@@ -149,4 +150,5 @@ class Recipe {
   String toString() {
     return 'Recipe(id: $id, name: $name, description: $description, ingredients: $ingredients, steps: $steps, category: $category, timeMinutes: $timeMinutes, servings: $servings, isFavorite: $isFavorite, imagePath: $imagePath)';
   }
+
 }

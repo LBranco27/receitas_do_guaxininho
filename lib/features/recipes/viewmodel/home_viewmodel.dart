@@ -1,12 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/datasources/recipe_local_datasource.dart';
+import '../../../data/datasources/recipe_remote_datasource.dart';
 import '../../../data/repositories/recipe_repository_impl.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../domain/repositories/recipe_repository.dart';
 
 /// Provider do repositório (DI). Override em main.dart para trocar implementações.
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
-  return RecipeRepositoryImpl(RecipeLocalDataSource());
+  //return RecipeRepositoryImpl(RecipeLocalDataSource());
+  return RecipeRepositoryImpl(RecipeRemoteDataSource());
 });
 
 // -------------------- STATE --------------------
