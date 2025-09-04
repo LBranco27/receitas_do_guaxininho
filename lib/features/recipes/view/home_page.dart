@@ -10,11 +10,6 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vm = ref.read(homeVmProvider.notifier);
-    // Call refresh when the widget is built to ensure data is fresh.
-    // Consider if this should be more targeted based on lifecycle events or specific actions.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      vm.refresh();
-    });
 
     final state = ref.watch(homeVmProvider);
 

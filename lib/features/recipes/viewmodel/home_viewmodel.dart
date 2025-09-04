@@ -52,7 +52,7 @@ class HomeViewModel extends StateNotifier<HomeState> {
   Future<void> load() async {
     state = state.copyWith(loading: true, error: '');
     try {
-      final list = await repo.getAll(
+      final List<Recipe> list = await repo.getAll(
         search: state.search.isEmpty ? null : state.search,
         category: state.category,
       );

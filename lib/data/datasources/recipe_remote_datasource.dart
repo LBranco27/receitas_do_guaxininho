@@ -10,13 +10,70 @@ class RecipeRemoteDataSource {
   final _supabaseClient = Supabase.instance.client;
 
 
-  Future<List> getAll() async {
+  Future<List<Recipe>> getAll({String? search, String? category}) async {
     try {
-      final response = await _supabaseClient.from('recipes').select();
-      return response.map((data) => Recipe.fromMap(data)).toList();
-    } catch (e) {
-      print('Erro ao buscar receitas: $e');
-      throw Exception('Falha ao buscar receitas');
+      var query = _supabaseClient
+          .from('recipes')
+          .select();
+
+      if (search != null && search.trim().isNotEmpty) {
+        query = query.ilike('name', '%${search.trim().toLowerCase()}%');
+      }
+
+      if (category != null && category.isNotEmpty) {
+        query = query.eq('category', category);
+      }
+
+      if (kDebugMode) {
+        print(
+            '[RecipeRemoteDataSource.getAll] Fetching from Supabase table "recipes" with filters: search="$search", category="$category"');
+      }
+
+      final response = await query.order('id', ascending: false);
+
+       if (kDebugMode) {
+        print('[RecipeRemoteDataSource.getAll] Received ${response
+            .length} items from Supabase.');
+      }
+
+      final List<Recipe> recipes = response.map((item) {
+        try {
+          final recipe = Recipe.fromMap(item);
+          if (kDebugMode) {
+            print('[RecipeRemoteDataSource.getAll] Parsed Recipe: ${recipe
+                .name}');
+          }
+          return recipe;
+        } catch (e, stackTrace) {
+          if (kDebugMode) {
+            print(
+                '[RecipeRemoteDataSource.getAll Error] Failed to parse recipe from Supabase data: $item');
+            print('[RecipeRemoteDataSource.getAll Error Details] $e');
+            print('[RecipeRemoteDataSource.getAll StackTrace] $stackTrace');
+          }
+          return Recipe(
+            id: (item)['id'] as int? ?? 0,
+            name: 'Error: Could Not Load',
+            description: 'Failed to parse recipe from server.',
+            ingredients: {},
+            steps: [],
+            category: '',
+            timeMinutes: 0,
+            servings: 0,
+          );
+        }
+      }).toList();
+
+      return recipes;
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        print('[RecipeRemoteDataSource.getAll Supabase Error] $error');
+        print(
+            '[RecipeRemoteDataSource.getAll Supabase StackTrace] $stackTrace');
+      }
+      // Re-throw the error to be handled by the repository or UI layer
+      // You might want to wrap it in a custom exception type
+      throw Exception('Failed to fetch recipes from Supabase: $error');
     }
   }
 
@@ -41,8 +98,9 @@ class RecipeRemoteDataSource {
           .single();
       return Recipe.fromMap(response);
     } catch (e) {
-       if (kDebugMode) {
-        print('[RecipeRemoteDataSource.getRecipeById Error] Failed to parse recipe with id $id: $e');
+      if (kDebugMode) {
+        print(
+            '[RecipeRemoteDataSource.getRecipeById Error] Failed to parse recipe with id $id: $e');
       }
       return null;
     }
@@ -50,17 +108,17 @@ class RecipeRemoteDataSource {
 
   Future<int?> create(Recipe recipe) async {
     try {
-      final Map<String, dynamic> recipeData = recipe.toMap();
-
       final dataToInsert = recipe.toMap()
-        ..remove('id');
+        ..remove('id')..remove("isFavorite");
 
       final response = await _supabaseClient
-        .from('recipes')
-        .insert(dataToInsert)
-        .select()
-        .single();
-      return Recipe.fromMap(response).id;
+          .from('recipes')
+          .insert(dataToInsert)
+          .select()
+          .single();
+      return Recipe
+          .fromMap(response)
+          .id;
     } catch (e) {
       print('Erro ao criar receita: $e');
       throw Exception('Falha ao criar receita');
@@ -71,8 +129,9 @@ class RecipeRemoteDataSource {
     try {
       final response = await _supabaseClient
           .from('recipes')
-          .update(recipe.toMap()..remove('id'))
-          .eq('id', recipe.id)
+          .update(recipe.toMap()
+          ..remove('id'))..remove("isFavorite")
+          .eq('id', recipe.id as Object)
           .select()
           .single();
       return Recipe.fromMap(response);
@@ -96,12 +155,12 @@ class RecipeRemoteDataSource {
 
   Future<List<String>> getCategories() async {
     try {
-      final response = await _supabaseClient.from('distinct_categories').select('category');
+      final response = await _supabaseClient.from('distinct_categories').select(
+          'category');
       if (response.isEmpty) {
         return [];
       }
       return response.map((data) => data['category'] as String).toList();
-
     } catch (e) {
       if (kDebugMode) {
         print('Erro ao buscar categorias: $e');
@@ -119,7 +178,8 @@ class RecipeRemoteDataSource {
           .select('id');
       if (response.isEmpty) {
         if (kDebugMode) {
-          print('Nenhuma receita encontrada com o id $id para alternar favorito.');
+          print(
+              'Nenhuma receita encontrada com o id $id para alternar favorito.');
         }
       }
     } catch (e) {
@@ -129,3 +189,4 @@ class RecipeRemoteDataSource {
       throw Exception('Falha ao alternar estado de favorito');
     }
   }
+}

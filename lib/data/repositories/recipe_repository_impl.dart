@@ -9,7 +9,7 @@ class RecipeRepositoryImpl implements RecipeRepository {
   RecipeRepositoryImpl(this.ds);
 
   @override
-  Future<List> getAll() =>
+  Future<List<Recipe>> getAll({String? search, String? category}) =>
       ds.getAll();
 
   @override

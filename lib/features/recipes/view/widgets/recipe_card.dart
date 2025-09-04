@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class RecipeCard extends StatelessWidget {
@@ -36,7 +37,42 @@ class RecipeCard extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                 child: imagePath == null
                     ? const ColoredBox(color: Color(0x11000000))
-                    : Image.file(File(imagePath!), fit: BoxFit.cover),
+                    : Image.network(
+                  imagePath!,
+                  height: 250,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 250,
+                      width: double.infinity,
+                      color: Colors.grey[300],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
+                    if (kDebugMode) {
+                      print('Error loading network image: $imagePath, Exception: $exception');
+                    }
+                    return Container(
+                      height: 250,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(12), // Match your style
+                      ),
+                      child: Icon(Icons.broken_image, color: Colors.grey[600], size: 50),
+                    );
+                  },
+
+                ),
               ),
             ),
             Padding(

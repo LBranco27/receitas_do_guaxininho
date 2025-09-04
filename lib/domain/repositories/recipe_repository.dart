@@ -1,7 +1,7 @@
 import '../entities/recipe.dart';
 
 abstract class RecipeRepository {
-  Future<List> getAll();
+  Future<List<Recipe>> getAll({String? search, String? category});
   Future<List> getFromCategory(String category);
   Future<Recipe?> getById(int id);
   Future<int?> create(Recipe recipe);

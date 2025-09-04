@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // Added import
@@ -337,18 +338,40 @@ class _RecipePageState extends ConsumerState<RecipePage> {
             if (widget.imagePath != null && widget.imagePath!.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(12.0),
-                child: widget.imagePath!.startsWith('assets/')
-                    ? Image.asset(
+                child: Image.network(
                         widget.imagePath!,
                         height: 250,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                      )
-                    : Image.file(
-                        File(widget.imagePath!),
-                        height: 250,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 250,
+                            width: double.infinity,
+                            color: Colors.grey[300],
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
+                          if (kDebugMode) {
+                            print('Error loading network image: $widget.imagePath, Exception: $exception');
+                          }
+                          return Container(
+                            height: 250,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(12), // Match your style
+                            ),
+                            child: Icon(Icons.broken_image, color: Colors.grey[600], size: 50),
+                          );
+                        },
                       ),
               ),
             if (widget.imagePath == null || widget.imagePath!.isEmpty)

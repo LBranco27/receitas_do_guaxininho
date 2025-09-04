@@ -63,16 +63,17 @@ class Recipe {
       'ingredients': jsonEncode(ingredients), // Store as JSON string
       'steps': jsonEncode(steps), // Store as JSON string
       'category': category,
-      'time_minutes': timeMinutes,
+      'timeMinutes': timeMinutes,
       'servings': servings,
-      'is_favorite': isFavorite ? 1 : 0,
-      'image_path': imagePath,
+      'isFavorite': isFavorite ? 1 : 0,
+      'imagePath': imagePath,
     };
   }
 
   factory Recipe.fromMap(Map<String, dynamic> map) {
     Map<String, List<String>> parsedIngredients = {};
     try {
+      print(map);
       final ingredientsData = jsonDecode(map['ingredients'] as String);
 
       if (ingredientsData is Map) {
@@ -139,10 +140,10 @@ class Recipe {
       ingredients: parsedIngredients,
       steps: parsedSteps,
       category: map['category'] as String,
-      timeMinutes: map['time_minutes'] as int,
+      timeMinutes: map['timeMinutes'] as int,
       servings: map['servings'] as int,
-      isFavorite: (map['is_favorite'] as int?) == 1,
-      imagePath: map['image_path'] as String?,
+      isFavorite: (map['isFavorite'] as int?) == 1,
+      imagePath: map['imagePath'] as String?,
     );
   }
 
