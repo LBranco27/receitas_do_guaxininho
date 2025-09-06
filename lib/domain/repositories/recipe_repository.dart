@@ -7,8 +7,10 @@ abstract class RecipeRepository {
   Future<int?> create(Recipe recipe);
   Future<Recipe> update(Recipe recipe);
   Future<void> delete(int id);
-  Future<void> toggleFavorite(int id, bool value);
   Future<List<String>> getCategories();
+  Future<void> addFavorite(int recipeId);
+  Future<void> removeFavorite(int recipeId);
+  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10});
 
   // (opcional para V2)
 }

@@ -5,10 +5,14 @@ import '../../../data/repositories/recipe_repository_impl.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../domain/repositories/recipe_repository.dart';
 
-/// Provider do repositório (DI). Override em main.dart para trocar implementações.
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
-  //return RecipeRepositoryImpl(RecipeLocalDataSource());
   return RecipeRepositoryImpl(RecipeRemoteDataSource());
+});
+
+final favoriteRecipeIdsProvider = FutureProvider<Set<int>>((ref) async {
+  final repo = ref.watch(recipeRepositoryProvider);
+  final favoriteRecipes = await repo.getFavoriteRecipes(limit: 9999);
+  return favoriteRecipes.map((r) => r.id!).toSet();
 });
 
 // -------------------- STATE --------------------
@@ -47,18 +51,47 @@ class HomeState {
 // -------------------- VIEWMODEL --------------------
 class HomeViewModel extends StateNotifier<HomeState> {
   final RecipeRepository repo;
-  HomeViewModel(this.repo) : super(const HomeState());
+  final Ref ref;
+
+  HomeViewModel(this.repo, this.ref) : super(const HomeState());
 
   Future<void> load() async {
     state = state.copyWith(loading: true, error: '');
     try {
-      final List<Recipe> list = await repo.getAll(
+      final recipes = await repo.getAll(
         search: state.search.isEmpty ? null : state.search,
         category: state.category,
       );
-      state = state.copyWith(loading: false, recipes: list);
+      final favoriteIds = await ref.read(favoriteRecipeIdsProvider.future);
+
+      final updatedRecipes = recipes.map((recipe) {
+        return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
+      }).toList();
+
+      state = state.copyWith(loading: false, recipes: updatedRecipes);
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
+    }
+  }
+
+  void updateFavoritesState(Set<int> favoriteIds) {
+    final updatedRecipes = state.recipes.map((recipe) {
+      return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
+    }).toList();
+    state = state.copyWith(recipes: updatedRecipes);
+  }
+
+  Future<void> toggleFavorite(int recipeId, bool isCurrentlyFavorite) async {
+    try {
+      if (isCurrentlyFavorite) {
+        await repo.removeFavorite(recipeId);
+      } else {
+        await repo.addFavorite(recipeId);
+      }
+      ref.invalidate(favoriteRecipeIdsProvider);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      ref.invalidate(favoriteRecipeIdsProvider);
     }
   }
 
@@ -75,10 +108,18 @@ class HomeViewModel extends StateNotifier<HomeState> {
   Future<void> refresh() => load();
 }
 
-// provider para a tela
+// -------------------- PROVIDER --------------------
 final homeVmProvider = StateNotifierProvider<HomeViewModel, HomeState>((ref) {
   final repo = ref.watch(recipeRepositoryProvider);
-  final vm = HomeViewModel(repo);
+  final vm = HomeViewModel(repo, ref);
   vm.load();
+
+  ref.listen(favoriteRecipeIdsProvider, (previous, next) {
+    if (next.hasValue) {
+      vm.updateFavoritesState(next.value!);
+    }
+  });
+
   return vm;
 });
+

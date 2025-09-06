@@ -29,9 +29,15 @@ class RecipeRepositoryImpl implements RecipeRepository {
   Future<void> delete(int id) => ds.delete(id);
 
   @override
-  Future<void> toggleFavorite(int id, bool value) =>
-      ds.toggleFavorite(id, value);
+  Future<List<String>> getCategories() => ds.getCategories();
 
   @override
-  Future<List<String>> getCategories() => ds.getCategories();
+  Future<void> addFavorite(int recipeId) => ds.addFavorite(recipeId);
+
+  @override
+  Future<void> removeFavorite(int recipeId) => ds.removeFavorite(recipeId);
+
+  @override
+  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) => ds.getFavoriteRecipes();
+
 }

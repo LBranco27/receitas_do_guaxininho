@@ -18,6 +18,7 @@ import 'features/auth/viewmodel/register_viewmodel.dart';
 //import 'data/datasources/recipe_local_datasource.dart';
 import 'data/datasources/recipe_remote_datasource.dart';
 import 'data/repositories/recipe_repository_impl.dart';
+import 'features/profile/view/profile_page.dart';
 import 'features/recipes/view/create_recipe_page.dart';
 import 'features/recipes/view/home_page.dart';
 import 'features/recipes/view/recipe_detail_page.dart';
@@ -104,6 +105,10 @@ class RecipesApp extends ConsumerWidget {
             GoRoute(
               path: 'create',
               builder: (context, state) => const CreateRecipePage(),
+            ),
+            GoRoute(
+              path: 'profile',
+              builder: (context, state) => const ProfilePage(),
             ),
           ],
         ),

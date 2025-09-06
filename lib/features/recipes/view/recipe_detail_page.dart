@@ -14,7 +14,7 @@ class RecipeDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(recipeDetailVmProvider(id));
 
-    if (state.loading) {
+    if (state.loading && state.recipe == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (state.error != null) {
@@ -27,6 +27,7 @@ class RecipeDetailPage extends ConsumerWidget {
 
     // Pass the initial favorite state from the loaded recipe
     return RecipePage(
+      key: ValueKey(r.id),
       id: r.id!, // Pass id for ViewModel provider
       title: r.name,
       imagePath: r.imagePath ?? 'assets/images/placeholder.png',
@@ -61,12 +62,12 @@ class RecipePage extends ConsumerStatefulWidget {
     required this.isFavorite,
   });
 
+
   @override
   ConsumerState<RecipePage> createState() => _RecipePageState();
 }
 
 class _RecipePageState extends ConsumerState<RecipePage> {
-  bool _isFavorited = false;
   bool _isEditMode = false;
   late TextEditingController _titleController;
   late TextEditingController _timeController;
@@ -77,7 +78,6 @@ class _RecipePageState extends ConsumerState<RecipePage> {
   @override
   void initState() {
     super.initState();
-    _isFavorited = widget.isFavorite;
     _titleController = TextEditingController(text: widget.title);
     // Extract numeric part for time and servings for editing
     _timeController = TextEditingController(text: widget.time.replaceAll(RegExp(r'[^0-9]'), ''));
@@ -106,12 +106,7 @@ class _RecipePageState extends ConsumerState<RecipePage> {
   }
 
   void _toggleFavorite() {
-    setState(() {
-      _isFavorited = !_isFavorited;
-    });
-    // Update through ViewModel
-    final recipeNotifier = ref.read(recipeDetailVmProvider(widget.id).notifier);
-    recipeNotifier.toggleFavorite();
+    ref.read(recipeDetailVmProvider(widget.id).notifier).toggleFavorite();
   }
 
   void _toggleEditMode() {
@@ -162,9 +157,6 @@ class _RecipePageState extends ConsumerState<RecipePage> {
         });
         _ingredientsController.text = ingredientsText.trim();
         _stepsController.text = (currentState.recipe?.steps ?? widget.preparationSteps).join('\n');
-        
-        // Also update the local _isFavorited state from the ViewModel
-        _isFavorited = currentState.recipe?.isFavorite ?? widget.isFavorite;
       }
     });
   }
@@ -297,18 +289,8 @@ class _RecipePageState extends ConsumerState<RecipePage> {
     final theme = Theme.of(context);
     final currentRecipeState = ref.watch(recipeDetailVmProvider(widget.id));
     final displayTitle = _isEditMode ? _titleController.text : (currentRecipeState.recipe?.name ?? widget.title);
-
-    // Update local _isFavorited if ViewModel changed it (e.g. after initial load)
-    // This is a bit of a workaround for ConsumerStatefulWidget not directly re-running initState on provider change
-    if (currentRecipeState.recipe != null && _isFavorited != currentRecipeState.recipe!.isFavorite && !_isEditMode) {
-       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if(mounted){
-          setState(() {
-            _isFavorited = currentRecipeState.recipe!.isFavorite;
-          });
-        }
-      });
-    }
+    final recipe = currentRecipeState.recipe;
+    final isFavorited = recipe?.isFavorite ?? widget.isFavorite;
 
 
     return Scaffold(
@@ -421,9 +403,9 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                     ),
                   const Spacer(),
                   IconButton(
-                    icon: Icon(_isFavorited ? Icons.favorite : Icons.favorite_border),
+                    icon: Icon(isFavorited ? Icons.favorite : Icons.favorite_border),
                     onPressed: _toggleFavorite,
-                    color: _isFavorited ? theme.colorScheme.primary : null,
+                    color: isFavorited ? theme.colorScheme.primary : null,
                   ),
                   IconButton(
                     icon: Icon(_isEditMode ? Icons.check : Icons.edit),
