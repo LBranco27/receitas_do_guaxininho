@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/viewmodel/login_viewmodel.dart'; // Import para o authRepositoryProvider
 import '../viewmodel/home_viewmodel.dart';
 import 'widgets/recipe_card.dart';
 
@@ -10,7 +11,6 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vm = ref.read(homeVmProvider.notifier);
-
     final state = ref.watch(homeVmProvider);
 
     return Scaffold(
@@ -21,6 +21,33 @@ class HomePage extends ConsumerWidget {
             onPressed: () => context.push('/create'),
             icon: const Icon(Icons.add),
             tooltip: 'Nova receita',
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sair',
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Confirmar Saída'),
+                  content: const Text('Você tem certeza que deseja sair?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancelar'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Sair'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmed == true) {
+                await ref.read(authRepositoryProvider).signOut();
+              }
+            },
           ),
         ],
       ),
@@ -96,3 +123,4 @@ class HomePage extends ConsumerWidget {
     );
   }
 }
+
