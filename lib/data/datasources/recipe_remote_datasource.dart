@@ -169,24 +169,49 @@ class RecipeRemoteDataSource {
     }
   }
 
-  Future<void> toggleFavorite(int id, bool value) async {
-    try {
-      final response = await _supabaseClient
-          .from('recipes')
-          .update({'is_favorite': !value})
-          .eq('id', id)
-          .select('id');
-      if (response.isEmpty) {
-        if (kDebugMode) {
-          print(
-              'Nenhuma receita encontrada com o id $id para alternar favorito.');
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao alternar favorito para receita $id: $e');
-      }
-      throw Exception('Falha ao alternar estado de favorito');
-    }
+  Future<void> addFavorite(int recipeId) async {
+    final userId = _supabaseClient.auth.currentUser?.id;
+    if (userId == null) throw 'Usuário não autenticado';
+    await _supabaseClient.from('user_favorites').insert({
+      'user_id': userId,
+      'recipe_id': recipeId,
+    });
   }
+
+  Future<void> removeFavorite(int recipeId) async {
+    final userId = _supabaseClient.auth.currentUser?.id;
+    if (userId == null) throw 'Usuário não autenticado';
+    await _supabaseClient
+        .from('user_favorites')
+        .delete()
+        .match({'user_id': userId, 'recipe_id': recipeId});
+  }
+
+  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) async {
+    final userId = _supabaseClient.auth.currentUser?.id;
+    if (userId == null) throw 'Usuário não autenticado';
+
+    final from = page * limit;
+    final to = from + limit - 1;
+
+    final favoriteRelations = await _supabaseClient
+        .from('user_favorites')
+        .select('recipe_id')
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
+        .range(from, to);
+
+    final recipeIds = favoriteRelations.map((fav) => fav['recipe_id'] as int).toList();
+    if (recipeIds.isEmpty) return [];
+
+    final response = await _supabaseClient
+        .from('recipes')
+        .select()
+        .inFilter('id', recipeIds);
+
+    final recipes = response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
+
+    return recipes.map((r) => r.copyWith(isFavorite: true)).toList();
+  }
+
 }

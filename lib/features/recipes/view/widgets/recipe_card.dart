@@ -8,12 +8,14 @@ class RecipeCard extends StatelessWidget {
   final String? imagePath;
   final bool favorite;
   final VoidCallback onTap;
+  final VoidCallback onFavoriteToggle;
 
   const RecipeCard({
     super.key,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    required this.onFavoriteToggle,
     this.imagePath,
     this.favorite = false,
   });
@@ -88,14 +90,17 @@ class RecipeCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 0),
               child: Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
             ),
-            const Spacer(),
+            // const Spacer(),
             Padding(
               padding: const EdgeInsets.all(8),
               child: Align(
                 alignment: Alignment.bottomRight,
-                child: Icon(
-                  favorite ? Icons.favorite : Icons.favorite_border,
-                  size: 18,
+                child: IconButton(
+                  icon: Icon(
+                    favorite ? Icons.favorite : Icons.favorite_border,
+                    color: favorite ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                  onPressed: onFavoriteToggle,
                 ),
               ),
             ),

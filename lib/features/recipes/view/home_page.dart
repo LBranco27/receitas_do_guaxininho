@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../auth/viewmodel/login_viewmodel.dart'; // Import para o authRepositoryProvider
+import '../../auth/viewmodel/login_viewmodel.dart';
+import '../../auth/viewmodel/profile_providers.dart';
 import '../viewmodel/home_viewmodel.dart';
 import 'widgets/recipe_card.dart';
 
@@ -13,9 +14,37 @@ class HomePage extends ConsumerWidget {
     final vm = ref.read(homeVmProvider.notifier);
     final state = ref.watch(homeVmProvider);
 
+    final userProfile = ref.watch(userProfileProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Receitas'),
+        title: userProfile.when(
+          data: (profile) {
+            final name = profile?['name'] as String?;
+            final avatarUrl = profile?['avatar_url'] as String?;
+
+            return Row(
+              children: [
+                InkWell(
+                  onTap: () => context.push('/profile'),
+                  customBorder: const CircleBorder(),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.grey.shade300,
+                    backgroundImage:
+                    avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                    child: avatarUrl == null
+                        ? const Icon(Icons.person, color: Colors.grey)
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(name != null ? 'Olá, $name' : 'Receitas'),
+              ],
+            );
+          },
+          loading: () => const Text('Carregando...'),
+          error: (_, __) => const Text('Receitas'),
+        ),
         actions: [
           IconButton(
             onPressed: () => context.push('/create'),
@@ -64,7 +93,7 @@ class HomePage extends ConsumerWidget {
             ),
           ),
           FutureBuilder<List<String>>(
-            future: ref.read(recipeRepositoryProvider).getCategories(), // Assuming recipeRepositoryProvider is accessible
+            future: ref.read(recipeRepositoryProvider).getCategories(),
             builder: (context, snap) {
               final cats = ['Todas', ...?snap.data];
               return SizedBox(
@@ -113,6 +142,9 @@ class HomePage extends ConsumerWidget {
                     imagePath: r.imagePath,
                     favorite: r.isFavorite,
                     onTap: () => context.push('/recipe/${r.id}'),
+                    onFavoriteToggle: () {
+                      vm.toggleFavorite(r.id!, r.isFavorite);
+                    },
                   );
                 },
               ),
