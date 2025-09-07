@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/datasources/recipe_local_datasource.dart';
 import '../../../data/datasources/recipe_remote_datasource.dart';
 import '../../../data/repositories/recipe_repository_impl.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../domain/repositories/recipe_repository.dart';
+import '../../profile/viewmodel/favorite_recipes_viewmodel.dart';
 
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
   return RecipeRepositoryImpl(RecipeRemoteDataSource());
@@ -89,6 +89,7 @@ class HomeViewModel extends StateNotifier<HomeState> {
         await repo.addFavorite(recipeId);
       }
       ref.invalidate(favoriteRecipeIdsProvider);
+      ref.invalidate(favoriteRecipesViewModelProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
       ref.invalidate(favoriteRecipeIdsProvider);

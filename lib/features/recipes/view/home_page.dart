@@ -26,7 +26,7 @@ class HomePage extends ConsumerWidget {
             return Row(
               children: [
                 InkWell(
-                  onTap: () => context.go('/profile'),
+                  onTap: () => context.push('/profile'),
                   customBorder: const CircleBorder(),
                   child: CircleAvatar(
                     backgroundColor: Colors.grey.shade300,
@@ -142,7 +142,6 @@ class HomePage extends ConsumerWidget {
                     imagePath: r.imagePath,
                     favorite: r.isFavorite,
                     onTap: () => context.push('/recipe/${r.id}'),
-                    // Adicionamos o callback para alternar o favorito
                     onFavoriteToggle: () {
                       vm.toggleFavorite(r.id!, r.isFavorite);
                     },

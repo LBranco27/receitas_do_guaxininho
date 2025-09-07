@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../domain/repositories/recipe_repository.dart';
-import 'home_viewmodel.dart'; // Assuming this provides recipeRepositoryProvider
+import 'home_viewmodel.dart';
+import '../../profile/viewmodel/favorite_recipes_viewmodel.dart'; // Assuming this provides recipeRepositoryProvider
 
 class RecipeDetailState {
   final bool loading;
@@ -54,6 +55,7 @@ class RecipeDetailViewModel extends StateNotifier<RecipeDetailState> {
         await repo.addFavorite(id);
       }
       ref.invalidate(favoriteRecipeIdsProvider);
+      ref.invalidate(favoriteRecipesViewModelProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
       ref.invalidate(favoriteRecipeIdsProvider);

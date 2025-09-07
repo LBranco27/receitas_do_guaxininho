@@ -44,27 +44,22 @@ class FavoriteRecipesViewModel extends StateNotifier<FavoriteRecipesState> {
   FavoriteRecipesViewModel(this.ref) : super(const FavoriteRecipesState());
 
   Future<void> loadInitial() async {
-    if (state.recipes.isNotEmpty) return;
-
-    state = state.copyWith(isLoading: true, page: 0, error: '');
-    await _fetchPage(0);
+    if (state.recipes.isEmpty) {
+      await loadPage(0);
+    }
   }
 
-  Future<void> loadMore() async {
-    if (state.isLoading || !state.hasMore) return;
+  Future<void> loadPage(int page) async {
+    if (page < 0) return;
 
-    state = state.copyWith(isLoading: true);
-    await _fetchPage(state.page + 1);
-  }
-
-  Future<void> _fetchPage(int page) async {
+    state = state.copyWith(isLoading: true, error: '');
     try {
       final repo = ref.read(recipeRepositoryProvider);
       final newRecipes = await repo.getFavoriteRecipes(page: page, limit: _pageSize);
 
       state = state.copyWith(
         isLoading: false,
-        recipes: page == 0 ? newRecipes : [...state.recipes, ...newRecipes],
+        recipes: newRecipes,
         page: page,
         hasMore: newRecipes.length == _pageSize,
         error: '',
