@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/viewmodel/login_viewmodel.dart';
 import '../../auth/viewmodel/profile_providers.dart';
+import '../../profile/viewmodel/favorite_recipes_viewmodel.dart';
 import '../viewmodel/home_viewmodel.dart';
 import 'widgets/recipe_card.dart';
 
@@ -75,6 +76,8 @@ class HomePage extends ConsumerWidget {
 
               if (confirmed == true) {
                 await ref.read(authRepositoryProvider).signOut();
+                ref.invalidate(favoriteRecipeIdsProvider);
+                ref.invalidate(favoriteRecipesViewModelProvider);
               }
             },
           ),

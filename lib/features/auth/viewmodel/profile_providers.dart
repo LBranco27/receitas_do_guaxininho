@@ -2,12 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:receitas_do_guaxininho/main.dart';
 
 final userProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final user = supabase.auth.currentUser;
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
 
   if (user == null) {
     return null;
   }
+
+  final supabase = ref.watch(supabaseClientProvider);
 
   try {
     final data = await supabase
