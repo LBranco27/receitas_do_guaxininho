@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:receitas_do_guaxininho/main.dart';
 import '../../../data/datasources/recipe_remote_datasource.dart';
 import '../../../data/repositories/recipe_repository_impl.dart';
 import '../../../domain/entities/recipe.dart';
@@ -10,6 +11,12 @@ final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
 });
 
 final favoriteRecipeIdsProvider = FutureProvider<Set<int>>((ref) async {
+  final authState = ref.watch(authStateProvider);
+
+  if (authState.valueOrNull == null) {
+  return {};
+  }
+
   final repo = ref.watch(recipeRepositoryProvider);
   final favoriteRecipes = await repo.getFavoriteRecipes(limit: 9999);
   return favoriteRecipes.map((r) => r.id!).toSet();
@@ -111,6 +118,8 @@ class HomeViewModel extends StateNotifier<HomeState> {
 
 // -------------------- PROVIDER --------------------
 final homeVmProvider = StateNotifierProvider<HomeViewModel, HomeState>((ref) {
+  ref.watch(authStateProvider);
+
   final repo = ref.watch(recipeRepositoryProvider);
   final vm = HomeViewModel(repo, ref);
   vm.load();

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:receitas_do_guaxininho/domain/entities/recipe.dart';
 import 'package:receitas_do_guaxininho/features/recipes/viewmodel/home_viewmodel.dart';
+import 'package:receitas_do_guaxininho/main.dart';
 
 // -------------------- STATE --------------------
 class FavoriteRecipesState {
@@ -73,6 +74,7 @@ class FavoriteRecipesViewModel extends StateNotifier<FavoriteRecipesState> {
 // -------------------- PROVIDER --------------------
 final favoriteRecipesViewModelProvider =
 StateNotifierProvider<FavoriteRecipesViewModel, FavoriteRecipesState>((ref) {
+  ref.watch(authStateProvider);
   return FavoriteRecipesViewModel(ref)..loadInitial();
 });
 
