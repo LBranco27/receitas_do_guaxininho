@@ -234,4 +234,17 @@ class RecipeRemoteDataSource {
     return response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
   }
 
+  Future<List<Recipe>> getUserRecipes({required String userId, required int page, required int limit}) async {
+    final from = page * limit;
+    final to = from + limit - 1;
+
+    final response = await _supabaseClient
+        .from('recipes')
+        .select()
+        .eq('owner', userId)
+        .range(from, to)
+        .order('created_at', ascending: false);
+
+    return response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
+  }
 }

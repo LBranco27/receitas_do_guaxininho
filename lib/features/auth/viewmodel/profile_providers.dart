@@ -25,3 +25,19 @@ final userProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
     return null;
   }
 });
+
+final anyUserProfileProvider = FutureProvider.family<Map<String, dynamic>?, String>((ref, userId) async {
+  final supabase = ref.watch(supabaseClientProvider);
+
+  try {
+    final data = await supabase
+        .from('profiles')
+        .select('id, name, avatar_url')
+        .eq('id', userId)
+        .single();
+    return data;
+  } catch (e) {
+    print('Erro ao buscar perfil do usuário $userId: $e');
+    return null;
+  }
+});

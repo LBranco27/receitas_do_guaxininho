@@ -6,9 +6,12 @@ import 'package:receitas_do_guaxininho/features/profile/viewmodel/profile_viewmo
 import 'package:receitas_do_guaxininho/features/profile/viewmodel/favorite_recipes_viewmodel.dart';
 import 'package:receitas_do_guaxininho/features/profile/viewmodel/my_recipes_viewmodel.dart';
 import 'package:receitas_do_guaxininho/domain/entities/recipe.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
-  const ProfilePage({super.key});
+  final String? userId; // userID of the profile to display, null for current user
+
+  const ProfilePage({super.key, this.userId});
 
   @override
   ConsumerState<ProfilePage> createState() => _ProfilePageState();
@@ -19,12 +22,27 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final userProfile = ref.watch(userProfileProvider);
+    final _supabaseClient = Supabase.instance.client;
+    final currentUserId = _supabaseClient.auth.currentUser?.id;
+    bool isCurrentUserProfile = widget.userId == null;
+    if (!isCurrentUserProfile) {
+      if (currentUserId == widget.userId) {
+        isCurrentUserProfile = true;
+      }
+    }
+    // Use anyUserProfileProvider if userId is provided, otherwise use userProfileProvider for the current user
+    final userProfileAsyncValue = isCurrentUserProfile
+        ? ref.watch(userProfileProvider)
+        : ref.watch(anyUserProfileProvider(widget.userId!));
+
     final profileViewModel = ref.watch(profileViewModelProvider);
+    // Conditional logic for favorites and my recipes view models might be needed
+    // For now, these are tied to the current user.
     final favoritesState = ref.watch(favoriteRecipesViewModelProvider);
     final favoritesNotifier = ref.read(favoriteRecipesViewModelProvider.notifier);
-    final myRecipesState = ref.watch(myRecipesViewModelProvider);
-    final myRecipesNotifier = ref.read(myRecipesViewModelProvider.notifier);
+    final myRecipesState = ref.watch(myRecipesViewModelProvider(widget.userId));
+    final myRecipesNotifier = ref.read(myRecipesViewModelProvider(widget.userId).notifier);
+
 
     ref.listen<AsyncValue<bool>>(profileViewModelProvider, (_, state) {
       if (state.hasError && !state.isLoading) {
@@ -33,7 +51,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
-      if (!state.isLoading && state.hasValue && state.value == true) {
+      if (!state.isLoading && state.hasValue && state.value == true && isCurrentUserProfile) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Foto de perfil atualizada com sucesso!'),
           backgroundColor: Colors.green,
@@ -43,12 +61,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Meu Perfil'),
+        title: Text(isCurrentUserProfile ? 'Meu Perfil' : 'Perfil'), // Title will be updated with name below
       ),
-      body: userProfile.when(
-        data: (profile) {
-          final name = profile?['name'] as String?;
-          final avatarUrl = profile?['avatar_url'] as String?;
+      body: userProfileAsyncValue.when(
+        data: (profileData) {
+          if (profileData == null && !isCurrentUserProfile) {
+            return const Center(child: Text('Perfil não encontrado.'));
+          }
+          final name = profileData?['name'] as String?;
+          final avatarUrl = profileData?['avatar_url'] as String?;
 
           return ListView(
             controller: _scrollController,
@@ -66,50 +87,58 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ),
               const SizedBox(height: 24),
               Text(
-                name ?? 'Usuário',
+                name ?? (isCurrentUserProfile ? 'Usuário' : 'Usuário Anônimo'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 20),
-              profileViewModel.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton.icon(
-                icon: const Icon(Icons.upload_file),
-                label: const Text('Alterar Foto'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+              if (isCurrentUserProfile) ...[
+                profileViewModel.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton.icon(
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Alterar Foto'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onPressed: () {
+                    ref
+                        .read(profileViewModelProvider.notifier)
+                        .uploadAvatar();
+                  },
                 ),
-                onPressed: () {
-                  ref
-                      .read(profileViewModelProvider.notifier)
-                      .uploadAvatar();
-                },
-              ),
+                const SizedBox(height: 40),
+                const Divider(),
+                const SizedBox(height: 16),
 
-              const SizedBox(height: 40),
-              const Divider(),
-              const SizedBox(height: 16),
+                Text(
+                  'Receitas Favoritas',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                _buildPaginatedFavorites(context, favoritesState, favoritesNotifier),
 
-              Text(
-                'Receitas Favoritas',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 40),
+                const Divider(),
+                const SizedBox(height: 16),
 
-              _buildPaginatedFavorites(context, favoritesState, favoritesNotifier),
-
-              const SizedBox(height: 40),
-              const Divider(),
-              const SizedBox(height: 16),
-
-              Text(
-                'Minhas Receitas',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-
-              _buildPaginatedMyRecipes(context, myRecipesState, myRecipesNotifier),
-
+                Text(
+                  'Minhas Receitas',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                _buildPaginatedMyRecipes(context, myRecipesState, myRecipesNotifier),
+              ] else ...[
+                const SizedBox(height: 40),
+                const Divider(),
+                const SizedBox(height: 16),
+                Text(
+                  'Receitas de ${name ?? "Usuário"}',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                _buildPaginatedMyRecipes(context, myRecipesState, myRecipesNotifier),
+              ],
               const SizedBox(height: 24),
             ],
           );
@@ -189,11 +218,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     if (state.recipes.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           child: Text(
-            'Você ainda não criou nenhuma receita. ✍️',
+            widget.userId == null
+              ? 'Você ainda não criou nenhuma receita. ✍️'
+              : 'Este usuário ainda não criou nenhuma receita. 😕',
             textAlign: TextAlign.center,
           ),
         ),
