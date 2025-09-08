@@ -321,38 +321,6 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                 },
               )
             : Text(displayTitle),
-        actions: [
-          if (ownerId != null && ownerProfileAsyncValue != null)
-            ownerProfileAsyncValue.when(
-              data: (profileData) {
-                if (profileData == null) return const SizedBox.shrink();
-                final avatarUrl = profileData['avatar_url'] as String?;
-                return IconButton(
-                  icon: CircleAvatar(
-                    backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: (avatarUrl == null || avatarUrl.isEmpty)
-                        ? const Icon(Icons.person)
-                        : null,
-                  ),
-                  onPressed: () {
-                    context.push('/user/$ownerId');
-                  },
-                );
-              },
-              loading: () => const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-              ),
-              error: (err, stack) => IconButton(
-                icon: const Icon(Icons.error),
-                onPressed: () {
-                   context.push('/user/$ownerId');
-                },
-              ),
-            ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -415,6 +383,51 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                 style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             // Title TextField is in AppBar when editing
+            if (ownerId != null && ownerProfileAsyncValue != null && !_isEditMode) ...[
+              const SizedBox(height: 8),
+              ownerProfileAsyncValue.when(
+                data: (profileData) {
+                  if (profileData == null) return const SizedBox.shrink();
+
+                  final username = profileData['name'] as String? ?? 'Usuário';
+                  final avatarUrl = profileData['avatar_url'] as String?;
+
+                  return InkWell(
+                    onTap: () => context.push('/user/$ownerId'),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 15,
+                            backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                            child: (avatarUrl == null || avatarUrl.isEmpty)
+                                ? const Icon(Icons.person, size: 16)
+                                : null,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Por $username',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12.0),
+                  child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+                error: (err, stack) => const SizedBox.shrink(), // Caso dê ruim, é melhor n mostrar nada
+              ),
+            ],
 
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
