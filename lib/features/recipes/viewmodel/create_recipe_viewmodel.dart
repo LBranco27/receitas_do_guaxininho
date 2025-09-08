@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../domain/repositories/recipe_repository.dart';
+import '../../profile/viewmodel/my_recipes_viewmodel.dart';
 import 'home_viewmodel.dart';
 
 class CreateRecipeState {
@@ -17,12 +18,16 @@ class CreateRecipeState {
 
 class CreateRecipeViewModel extends StateNotifier<CreateRecipeState> {
   final RecipeRepository repo;
-  CreateRecipeViewModel(this.repo) : super(const CreateRecipeState());
+  final Ref ref;
+
+  CreateRecipeViewModel(this.repo, this.ref) : super(const CreateRecipeState());
 
   Future<int?> create(Recipe r) async {
     state = state.copyWith(saving: true, error: '');
     try {
       final id = await repo.create(r);
+      ref.invalidate(homeVmProvider);
+      ref.invalidate(myRecipesViewModelProvider);
       state = state.copyWith(saving: false);
       return id;
     } catch (e) {
@@ -35,5 +40,5 @@ class CreateRecipeViewModel extends StateNotifier<CreateRecipeState> {
 final createRecipeVmProvider =
 StateNotifierProvider<CreateRecipeViewModel, CreateRecipeState>((ref) {
   final repo = ref.watch(recipeRepositoryProvider);
-  return CreateRecipeViewModel(repo);
+  return CreateRecipeViewModel(repo, ref);
 });

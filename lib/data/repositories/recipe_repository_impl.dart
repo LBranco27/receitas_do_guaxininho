@@ -40,4 +40,7 @@ class RecipeRepositoryImpl implements RecipeRepository {
   @override
   Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) => ds.getFavoriteRecipes();
 
+  @override
+  Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10}) => ds.getMyRecipes();
+
 }

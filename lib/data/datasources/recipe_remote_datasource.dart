@@ -55,6 +55,7 @@ class RecipeRemoteDataSource {
             id: (item)['id'] as int? ?? 0,
             name: 'Error: Could Not Load',
             description: 'Failed to parse recipe from server.',
+            owner: (item)['owner'] as String,
             ingredients: {},
             steps: [],
             category: '',
@@ -212,6 +213,25 @@ class RecipeRemoteDataSource {
     final recipes = response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
 
     return recipes.map((r) => r.copyWith(isFavorite: true)).toList();
+  }
+
+  Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10}) async {
+    final userId = _supabaseClient.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Usuário não autenticado');
+    }
+
+    final from = page * limit;
+    final to = from + limit - 1;
+
+    final response = await _supabaseClient
+        .from('recipes')
+        .select()
+        .eq('owner', userId)
+        .range(from, to)
+        .order('created_at', ascending: false);
+
+    return response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
   }
 
 }
