@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../auth/viewmodel/profile_providers.dart';
 import '../../../domain/entities/recipe.dart';
 import '../viewmodel/create_recipe_viewmodel.dart';
 
@@ -35,6 +36,7 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
   Widget build(BuildContext context) {
     final viewModel = ref.watch(createRecipeVmProvider.notifier);
     final theme = Theme.of(context);
+    final userProfile = ref.watch(userProfileProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nova Receita')),
@@ -175,6 +177,7 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
                     final recipe = Recipe(
                       name: _name.text,
                       description: _description.text,
+                      owner: userProfile.value?['id'] as String,
                       ingredients: parsedIngredients,
                       steps: _steps.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                       category: _category.text,

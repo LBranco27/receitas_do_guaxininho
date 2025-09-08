@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:receitas_do_guaxininho/features/auth/viewmodel/profile_providers.dart';
+import 'package:receitas_do_guaxininho/features/profile/viewmodel/profile_viewmodel.dart';
 import 'package:receitas_do_guaxininho/features/profile/viewmodel/favorite_recipes_viewmodel.dart';
-import '../viewmodel/profile_viewmodel.dart';
+import 'package:receitas_do_guaxininho/features/profile/viewmodel/my_recipes_viewmodel.dart';
 import 'package:receitas_do_guaxininho/domain/entities/recipe.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -22,6 +23,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final profileViewModel = ref.watch(profileViewModelProvider);
     final favoritesState = ref.watch(favoriteRecipesViewModelProvider);
     final favoritesNotifier = ref.read(favoriteRecipesViewModelProvider.notifier);
+    final myRecipesState = ref.watch(myRecipesViewModelProvider);
+    final myRecipesNotifier = ref.read(myRecipesViewModelProvider.notifier);
 
     ref.listen<AsyncValue<bool>>(profileViewModelProvider, (_, state) {
       if (state.hasError && !state.isLoading) {
@@ -95,8 +98,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
               _buildPaginatedFavorites(context, favoritesState, favoritesNotifier),
 
+              const SizedBox(height: 40),
+              const Divider(),
+              const SizedBox(height: 16),
+
+              Text(
+                'Minhas Receitas',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+
+              _buildPaginatedMyRecipes(context, myRecipesState, myRecipesNotifier),
+
               const SizedBox(height: 24),
-              const Text("Outra seção de conteúdo aqui..."),
             ],
           );
         },
@@ -121,6 +135,65 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           padding: EdgeInsets.all(16.0),
           child: Text(
             'Você ainda não favoritou nenhuma receita. 😕',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        if (state.isLoading)
+          const Center(child: Padding(
+            padding: EdgeInsets.all(32.0),
+            child: CircularProgressIndicator(),
+          ))
+        else
+          ...state.recipes.map((recipe) => _buildRecipeCard(context, recipe)),
+
+        const SizedBox(height: 16),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton.icon(
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Anterior'),
+              onPressed: state.page == 0 ? null : () {
+                notifier.loadPage(state.page - 1);
+              },
+            ),
+
+            Text('Página ${state.page + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
+
+            TextButton.icon(
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('Próxima'),
+              onPressed: !state.hasMore ? null : () {
+                notifier.loadPage(state.page + 1);
+              },
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _buildPaginatedMyRecipes(BuildContext context, MyRecipesState state, MyRecipesViewModel notifier) {
+    if (state.isLoading && state.recipes.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (state.error != null && state.recipes.isEmpty) {
+      return Center(child: Text('Erro: ${state.error}'));
+    }
+
+    if (state.recipes.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text(
+            'Você ainda não criou nenhuma receita. ✍️',
             textAlign: TextAlign.center,
           ),
         ),

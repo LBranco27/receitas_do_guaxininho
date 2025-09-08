@@ -7,6 +7,7 @@ class Recipe {
   final int? id;
   final String name;
   final String description;
+  final String? owner;
   final Map<String, List<String>> ingredients;
   final List<String> steps;
   final String category;
@@ -19,6 +20,7 @@ class Recipe {
     this.id,
     required this.name,
     required this.description,
+    required this.owner,
     required this.ingredients,
     required this.steps,
     required this.category,
@@ -32,6 +34,7 @@ class Recipe {
     int? id,
     String? name,
     String? description,
+    String? owner,
     Map<String, List<String>>? ingredients,
     List<String>? steps,
     String? category,
@@ -45,6 +48,7 @@ class Recipe {
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
+      owner: owner ?? this.owner,
       ingredients: ingredients ?? this.ingredients,
       steps: steps ?? this.steps,
       category: category ?? this.category,
@@ -60,6 +64,7 @@ class Recipe {
       'id': id,
       'name': name,
       'description': description,
+      'owner': owner,
       'ingredients': jsonEncode(ingredients), // Store as JSON string
       'steps': jsonEncode(steps), // Store as JSON string
       'category': category,
@@ -137,6 +142,7 @@ class Recipe {
       id: map['id'] as int?,
       name: map['name'] as String,
       description: map['description'] as String,
+      owner: map['owner'] as String,
       ingredients: parsedIngredients,
       steps: parsedSteps,
       category: map['category'] as String,

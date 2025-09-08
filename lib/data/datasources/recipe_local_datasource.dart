@@ -42,7 +42,7 @@ class RecipeLocalDataSource {
           print('[RecipeLocalDataSource.getAll Error] Failed to parse recipe with id ${e['id']}: $ex');
           print('[RecipeLocalDataSource.getAll StackTrace] $stackTrace');
         }
-        return Recipe(name: 'Error Recipe', description: '', ingredients: {"Erro":["Falha ao carregar receita com ID ${e['id']}"]}, steps: [], category: '', timeMinutes: 0, servings: 0, id: (e['id'] as int?) ?? 0);
+        return Recipe(name: 'Error Recipe', description: '', owner: '', ingredients: {"Erro":["Falha ao carregar receita com ID ${e['id']}"]}, steps: [], category: '', timeMinutes: 0, servings: 0, id: (e['id'] as int?) ?? 0);
       }
     }).toList();
   }
@@ -98,6 +98,7 @@ class RecipeLocalDataSource {
     final demo1 = Recipe(
       name: 'Salada azul com frango',
       description: 'Refrescante e rápida para o dia a dia.',
+      owner: '',
       ingredients: {
         "Proteína": ["250 g de peito de frango"],
         "Salada Base": ["1 alface romana", "Croutons a gosto"],
@@ -117,6 +118,7 @@ class RecipeLocalDataSource {
     final demo2 = Recipe(
       name: 'Martini de Morango',
       description: 'Refrescante e rápida para o dia a dia.',
+      owner: '',
       ingredients: {
         "Bebida": ["200ml de martini de preferência"],
         "Fruta": ["100g de morangos selecionados à mão por himalios"]
