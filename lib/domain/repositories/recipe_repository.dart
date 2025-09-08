@@ -13,5 +13,6 @@ abstract class RecipeRepository {
   Future<void> removeFavorite(int recipeId);
   Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10});
   Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10});
+  Future<List<Recipe>> getUserRecipes({required String userId, required int page, required int limit});
 
 }

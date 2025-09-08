@@ -120,6 +120,13 @@ class RecipesApp extends ConsumerWidget {
           path: '/register',
           builder: (context, state) => const RegisterPage(),
         ),
+        GoRoute(
+          path: '/user/:userId',
+          builder: (context, state) {
+            final userId = state.pathParameters['userId']!;
+            return ProfilePage(userId: userId);
+          },
+        ),
       ],
       redirect: (context, state) {
         final isLoggedIn = authState.value != null;

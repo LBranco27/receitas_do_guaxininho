@@ -38,9 +38,11 @@ class RecipeRepositoryImpl implements RecipeRepository {
   Future<void> removeFavorite(int recipeId) => ds.removeFavorite(recipeId);
 
   @override
-  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) => ds.getFavoriteRecipes();
+  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) => ds.getFavoriteRecipes(); // Consider adding pagination here too if not already handled by ds
 
   @override
-  Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10}) => ds.getMyRecipes();
+  Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10}) => ds.getMyRecipes(); // Consider adding pagination here too if not already handled by ds
 
+  @override
+  Future<List<Recipe>> getUserRecipes({required String userId, required int page, required int limit}) => ds.getUserRecipes(userId: userId, page: page, limit: limit);
 }

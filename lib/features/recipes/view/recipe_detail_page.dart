@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // Added import
+import 'package:receitas_do_guaxininho/features/auth/viewmodel/profile_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../viewmodel/recipe_detail_viewmodel.dart';
 import '../../../domain/entities/recipe.dart'; // Ensure Recipe entity is imported if needed for type
 
@@ -36,6 +38,7 @@ class RecipeDetailPage extends ConsumerWidget {
       ingredients: r.ingredients,
       preparationSteps: r.steps,
       isFavorite: r.isFavorite, // Pass initial favorite state
+      ownerId: r.owner
     );
   }
 }
@@ -49,6 +52,7 @@ class RecipePage extends ConsumerStatefulWidget {
   final Map<String, List<String>> ingredients;
   final List<String> preparationSteps;
   final bool isFavorite;
+  final String? ownerId;
 
   const RecipePage({
     super.key,
@@ -60,6 +64,7 @@ class RecipePage extends ConsumerStatefulWidget {
     required this.ingredients,
     required this.preparationSteps,
     required this.isFavorite,
+    required this.ownerId,
   });
 
 
@@ -290,8 +295,14 @@ class _RecipePageState extends ConsumerState<RecipePage> {
     final currentRecipeState = ref.watch(recipeDetailVmProvider(widget.id));
     final displayTitle = _isEditMode ? _titleController.text : (currentRecipeState.recipe?.name ?? widget.title);
     final recipe = currentRecipeState.recipe;
+    final ownerId = widget.ownerId; // Use widget.ownerId
     final isFavorited = recipe?.isFavorite ?? widget.isFavorite;
+    final _supabaseClient = Supabase.instance.client;
+    final currentUserId = _supabaseClient.auth.currentUser?.id;
+    final bool isOwner = currentUserId != null && ownerId != null && ownerId == currentUserId;
 
+    // Watch for owner profile data
+    final ownerProfileAsyncValue = ownerId != null ? ref.watch(anyUserProfileProvider(ownerId)) : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -310,7 +321,38 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                 },
               )
             : Text(displayTitle),
-        actions: [],
+        actions: [
+          if (ownerId != null && ownerProfileAsyncValue != null)
+            ownerProfileAsyncValue.when(
+              data: (profileData) {
+                if (profileData == null) return const SizedBox.shrink();
+                final avatarUrl = profileData['avatar_url'] as String?;
+                return IconButton(
+                  icon: CircleAvatar(
+                    backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                        ? NetworkImage(avatarUrl)
+                        : null,
+                    child: (avatarUrl == null || avatarUrl.isEmpty)
+                        ? const Icon(Icons.person)
+                        : null,
+                  ),
+                  onPressed: () {
+                    context.push('/user/$ownerId');
+                  },
+                );
+              },
+              loading: () => const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+              error: (err, stack) => IconButton(
+                icon: const Icon(Icons.error),
+                onPressed: () {
+                   context.push('/user/$ownerId');
+                },
+              ),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -407,10 +449,11 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                     onPressed: _toggleFavorite,
                     color: isFavorited ? theme.colorScheme.primary : null,
                   ),
-                  IconButton(
-                    icon: Icon(_isEditMode ? Icons.check : Icons.edit),
-                    onPressed: _toggleEditMode,
-                  ),
+                  if (isOwner)
+                    IconButton(
+                      icon: Icon(_isEditMode ? Icons.check : Icons.edit),
+                      onPressed: _toggleEditMode,
+                    ),
                 ],
               ),
             ),
