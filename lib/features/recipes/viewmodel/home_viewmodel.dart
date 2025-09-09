@@ -27,9 +27,9 @@ class HomeState {
   final bool loading;
   final String? error;
   final String search;
-  // O 'category' foi removido para dar lugar ao mapa de receitas
   final Map<String, List<Recipe>> categorizedRecipes;
-  final List<String> categories; // Usado para manter a ordem na UI
+  final List<String> categories; // Categorias visíveis APÓS a busca
+  final List<String> allAvailableCategories; // TODAS as categorias para os balões
 
   const HomeState({
     this.loading = false,
@@ -37,6 +37,7 @@ class HomeState {
     this.search = '',
     this.categorizedRecipes = const {},
     this.categories = const [],
+    this.allAvailableCategories = const [],
   });
 
   HomeState copyWith({
@@ -45,6 +46,7 @@ class HomeState {
     String? search,
     Map<String, List<Recipe>>? categorizedRecipes,
     List<String>? categories,
+    List<String>? allAvailableCategories,
   }) {
     return HomeState(
       loading: loading ?? this.loading,
@@ -52,6 +54,8 @@ class HomeState {
       search: search ?? this.search,
       categorizedRecipes: categorizedRecipes ?? this.categorizedRecipes,
       categories: categories ?? this.categories,
+      allAvailableCategories:
+      allAvailableCategories ?? this.allAvailableCategories,
     );
   }
 }
@@ -66,10 +70,15 @@ class HomeViewModel extends StateNotifier<HomeState> {
   Future<void> load() async {
     state = state.copyWith(loading: true, error: '');
     try {
-      // Busca todas as receitas, aplicando o filtro de busca se houver
+      // Busca todas as categorias disponíveis apenas uma vez, na primeira carga
+      if (state.allAvailableCategories.isEmpty) {
+        final allCats = await repo.getCategories();
+        allCats.sort(); // Mantém a lista ordenada
+        state = state.copyWith(allAvailableCategories: allCats);
+      }
+
       final recipes = await repo.getAll(
         search: state.search.isEmpty ? null : state.search,
-        // O filtro de categoria foi removido da busca principal
       );
       final favoriteIds = await ref.read(favoriteRecipeIdsProvider.future);
 
@@ -77,13 +86,11 @@ class HomeViewModel extends StateNotifier<HomeState> {
         return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
       }).toList();
 
-      // Agrupa as receitas por categoria
       final newCategorizedRecipes = <String, List<Recipe>>{};
       for (final recipe in updatedRecipes) {
         (newCategorizedRecipes[recipe.category] ??= []).add(recipe);
       }
 
-      // Cria uma lista ordenada com os nomes das categorias
       final newCategories = newCategorizedRecipes.keys.toList()..sort();
 
       state = state.copyWith(
@@ -126,9 +133,6 @@ class HomeViewModel extends StateNotifier<HomeState> {
     state = state.copyWith(search: value);
     load();
   }
-
-  // O método setCategory não é mais necessário
-  // void setCategory(String? value) { ... }
 
   Future<void> refresh() => load();
 }
