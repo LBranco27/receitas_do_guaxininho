@@ -1,4 +1,4 @@
-# 📱 App de Receitas Flutter
+# 📱 Receitas do Guaxinim
 
 Um aplicativo mobile de receitas desenvolvido com Flutter, inspirado nos apps **TudoGostoso** e **Tasty**, com foco em simplicidade, praticidade e organização na cozinha.
 
@@ -6,34 +6,19 @@ Um aplicativo mobile de receitas desenvolvido com Flutter, inspirado nos apps **
 ![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-Projeto desenvolvido por Pedro Caetano, Lucas Branco e João Guilherme Benjamin, como parte da disciplina de Desenvolvimento Mobile com Flutter 🚀
+Projeto desenvolvido como parte da disciplina de Desenvolvimento Mobile com Flutter
 
----
 
-## Installation
-
-1. Create a .env file on repository's root directory.
-2. Add SUPABASE_KEY environment variable.
-3. Run `flutter pub get` to install dependencies.
-4. Run `flutter run` to start the app.
+## Membros da equipe
+- Pedro Caetano (pedro.caetano@ufape.edu.br)
+- Lucas Branco (lucas.brancom@ufape.edu.br)
+- João Guilherme Benjamin (joao.rezende@ufape.edu.br)
 
 ---
 
 ## 🧠 Motivação
 
 A motivação para desenvolver este app de receitas é oferecer uma solução simples, acessível e organizada para quem busca cozinhar em casa, com foco em uma experiência intuitiva e leve. Seu diferencial está na interface minimalista e funcional, que permite encontrar, salvar e gerenciar receitas favoritas de forma rápida, sem distrações ou excesso de informações.
-
----
-
-## 📌 Protótipo no Figma
-
-📎 Link para o protótipo: **https://www.figma.com/design/0kwdes2OWzNKVgDSONZWZP/Projeto-Mobile-Receitas?node-id=0-1&t=7C6aAE6yAeSZLQHz-1**
-
----
-
-## 🎬 Apresentação
-
-📎 Link para a apresentação: **https://youtu.be/HK26VZ7ps2Y**
 
 ---
 
@@ -54,43 +39,64 @@ Pessoas interessadas em cozinhar em casa, desde iniciantes até usuários mais e
 
 ---
 
+## Installation
+
+1. Create a .env file on repository's root directory.
+2. Add SUPABASE_KEY environment variable.
+3. Run `flutter pub get` to install dependencies.
+4. Run `flutter run` to start the app.
+
+---
+
+## 📌 Protótipo no Figma
+
+📎 Link para o protótipo: **https://www.figma.com/design/0kwdes2OWzNKVgDSONZWZP/Projeto-Mobile-Receitas?node-id=0-1&t=7C6aAE6yAeSZLQHz-1**
+
+---
+
+## 🎬 Apresentação
+
+📎 Link para a apresentação: **https://youtu.be/HK26VZ7ps2Y**
+
+---
+
 ## 🧩 Funcionalidades
 
 ### ✅ Funcionalidades Essenciais (MVP)
 
 #### 📚 Receitas
-- [ ] Listar todas as receitas disponíveis
-- [ ] Visualizar detalhes da receita (nome, descrição, ingredientes, preparo, imagem)
-- [ ] Filtrar receitas por categoria (massas, sopas, etc.)
-- [ ] Buscar receitas pelo nome
-- [ ] Marcar/desmarcar receitas como favoritas
-- [ ] Visualizar lista de receitas favoritas
+- [x] Listar todas as receitas disponíveis
+- [x] Visualizar detalhes da receita (nome, descrição, ingredientes, preparo, imagem)
+- [x] Filtrar receitas por categoria (massas, sopas, etc.)
+- [x] Buscar receitas pelo nome
+- [x] Marcar/desmarcar receitas como favoritas
+- [x] Visualizar lista de receitas favoritas
 
 #### 🧭 Interface e Navegação
-- [ ] Tela inicial com destaques
-- [ ] Tela de listagem geral
-- [ ] Tela de detalhes
-- [ ] Tela de favoritos
-- [ ] Navegação entre telas (bottom navigation ou drawer)
+- [x] Tela inicial com destaques
+- [x] Tela de listagem geral
+- [x] Tela de detalhes
+- [x] Tela de favoritos
+- [x] Navegação entre telas (bottom navigation ou drawer)
 
 ---
 
 ### 🔄 Funcionalidades Intermediárias (Versão 2)
 
 #### 📝 Gerenciamento de Receitas (CRUD)
-- [ ] Criar nova receita com nome, descrição, ingredientes, preparo e imagem
-- [ ] Editar receitas existentes
-- [ ] Excluir receitas
-- [ ] Validações de formulário
+- [x] Criar nova receita com nome, descrição, ingredientes, preparo e imagem
+- [x] Editar receitas existentes
+- [x] Excluir receitas
+- [x] Validações de formulário
 
 #### 🗂️ Categorias Dinâmicas
-- [ ] Selecionar categoria ao criar/editar
-- [ ] Visualizar receitas por abas ou scroll horizontal por categoria
+- [x] Selecionar categoria ao criar/editar
+- [x] Visualizar receitas por abas ou scroll horizontal por categoria
 
 #### 🎨 Melhoria de UI/UX
 - [ ] Tela de splash ou loading
-- [ ] Snackbars ou dialogs de feedback
-- [ ] Skeleton ou shimmer no carregamento de conteúdo
+- [x] Snackbars ou dialogs de feedback
+- [x] Skeleton ou shimmer no carregamento de conteúdo
 
 ---
 
@@ -118,7 +124,7 @@ Pessoas interessadas em cozinhar em casa, desde iniciantes até usuários mais e
 
 - Flutter 3.x
 - Dart
-- SQLite (armazenamento local)
+- Supabase (armazenamento remoto)
   
 ---
 ## 📄 Licença
