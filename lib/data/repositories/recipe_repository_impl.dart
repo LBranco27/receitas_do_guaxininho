@@ -4,17 +4,15 @@ import '../datasources/recipe_local_datasource.dart';
 import '../datasources/recipe_remote_datasource.dart';
 
 class RecipeRepositoryImpl implements RecipeRepository {
-  //final RecipeLocalDataSource ds;
   final RecipeRemoteDataSource ds;
   RecipeRepositoryImpl(this.ds);
 
   @override
   Future<List<Recipe>> getAll({String? search, String? category}) =>
-      ds.getAll();
+      ds.getAll(search: search, category: category); // <- FIX
 
   @override
-  Future<List> getFromCategory(String category) =>
-      ds.getFromCategory(category);
+  Future<List> getFromCategory(String category) => ds.getFromCategory(category);
 
   @override
   Future<Recipe?> getById(int id) => ds.getById(id);
@@ -38,11 +36,17 @@ class RecipeRepositoryImpl implements RecipeRepository {
   Future<void> removeFavorite(int recipeId) => ds.removeFavorite(recipeId);
 
   @override
-  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) => ds.getFavoriteRecipes(); // Consider adding pagination here too if not already handled by ds
+  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) =>
+      ds.getFavoriteRecipes();
 
   @override
-  Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10}) => ds.getMyRecipes(); // Consider adding pagination here too if not already handled by ds
+  Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10}) =>
+      ds.getMyRecipes();
 
   @override
-  Future<List<Recipe>> getUserRecipes({required String userId, required int page, required int limit}) => ds.getUserRecipes(userId: userId, page: page, limit: limit);
+  Future<List<Recipe>> getUserRecipes({
+    required String userId,
+    required int page,
+    required int limit,
+  }) => ds.getUserRecipes(userId: userId, page: page, limit: limit);
 }

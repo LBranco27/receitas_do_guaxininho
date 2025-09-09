@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../domain/entities/recipe.dart'; // Adicionado para usar o tipo Recipe
 import '../../auth/viewmodel/login_viewmodel.dart';
 import '../../auth/viewmodel/profile_providers.dart';
 import '../../profile/viewmodel/favorite_recipes_viewmodel.dart';
@@ -97,59 +98,35 @@ class HomePage extends ConsumerWidget {
               ),
             ),
           ),
-          FutureBuilder<List<String>>(
-            future: ref.read(recipeRepositoryProvider).getCategories(),
-            builder: (context, snap) {
-              final cats = ['Todas', ...?snap.data];
-              return SizedBox(
-                height: 44,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemBuilder: (_, i) {
-                    final label = cats[i];
-                    final selected = (state.category ?? 'Todas') == label;
-                    return ChoiceChip(
-                      label: Text(label),
-                      selected: selected,
-                      onSelected: (_) =>
-                          vm.setCategory(label == 'Todas' ? null : label),
-                    );
-                  },
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemCount: cats.length,
-                ),
-              );
-            },
-          ),
+          // O FutureBuilder com os ChoiceChips foi removido
           const SizedBox(height: 8),
           Expanded(
-            child: state.loading
+            child: state.loading && state.categorizedRecipes.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : state.error != null
                 ? Center(child: Text('Erro: ${state.error}'))
+                : state.categories.isEmpty // Checa se há categorias para exibir
+                ? Center(
+              child: Text(
+                state.search.isEmpty
+                    ? 'Nenhuma receita encontrada.'
+                    : 'Nenhum resultado para "${state.search}"',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            )
                 : RefreshIndicator(
               onRefresh: vm.refresh,
-              child: GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: .80,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                ),
-                itemCount: state.recipes.length,
+              // O GridView foi substituído por um ListView
+              child: ListView.builder(
+                // O padding foi movido do GridView para o ListView
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                itemCount: state.categories.length,
                 itemBuilder: (_, i) {
-                  final r = state.recipes[i];
-                  return RecipeCard(
-                    title: r.name,
-                    subtitle: '${r.timeMinutes} min • ${r.servings} pessoas',
-                    imagePath: r.imagePath,
-                    favorite: r.isFavorite,
-                    onTap: () => context.push('/recipe/${r.id}'),
-                    onFavoriteToggle: () {
-                      vm.toggleFavorite(r.id!, r.isFavorite);
-                    },
+                  final category = state.categories[i];
+                  final recipes = state.categorizedRecipes[category]!;
+                  return _CategoryCarousel(
+                    category: category,
+                    recipes: recipes,
                   );
                 },
               ),
@@ -161,3 +138,58 @@ class HomePage extends ConsumerWidget {
   }
 }
 
+// Widget auxiliar para renderizar cada carrossel de categoria
+class _CategoryCarousel extends ConsumerWidget {
+  final String category;
+  final List<Recipe> recipes;
+
+  const _CategoryCarousel({
+    required this.category,
+    required this.recipes,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vm = ref.read(homeVmProvider.notifier);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          // Adiciona um espaçamento vertical entre os carrosséis
+          padding: const EdgeInsets.only(bottom: 8.0, top: 16.0, left: 4.0),
+          child: Text(
+            category,
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+        ),
+        SizedBox(
+          height: 230, // Altura fixa para a área do carrossel
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: recipes.length,
+            itemBuilder: (context, index) {
+              final r = recipes[index];
+              return Container(
+                // Define uma largura para os cards dentro do carrossel
+                width: 180,
+                // Mantém o espaçamento entre os cards
+                margin: const EdgeInsets.only(right: 12),
+                child: RecipeCard(
+                  title: r.name,
+                  subtitle: '${r.timeMinutes} min • ${r.servings} pessoas',
+                  imagePath: r.imagePath,
+                  favorite: r.isFavorite,
+                  onTap: () => context.push('/recipe/${r.id}'),
+                  onFavoriteToggle: () {
+                    vm.toggleFavorite(r.id!, r.isFavorite);
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -1,25 +1,26 @@
 import 'package:flutter/foundation.dart'; // Import for debugPrint
-// import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../domain/entities/recipe.dart';
-import '../db/app_database.dart';
 import '../../domain/entities/recipe.dart';
 
 class RecipeRemoteDataSource {
-  //Future<Database> get _db async => AppDatabase().database;
   final _supabaseClient = Supabase.instance.client;
-
 
   Future<List<Recipe>> getAll({String? search, String? category}) async {
     try {
-      var query = _supabaseClient
-          .from('recipes')
-          .select();
+      var query = _supabaseClient.from('recipes').select();
 
+      // ## INÍCIO DA ALTERAÇÃO ##
+      // A lógica de busca agora considera tanto o nome quanto a categoria.
       if (search != null && search.trim().isNotEmpty) {
-        query = query.ilike('name', '%${search.trim().toLowerCase()}%');
+        final searchTerm = '%${search.trim().toLowerCase()}%';
+        // Usamos o filtro 'or' do Supabase para buscar em ambas as colunas
+        // com uma condição "OU".
+        query = query.or('name.ilike.$searchTerm,category.ilike.$searchTerm');
       }
+      // ## FIM DA ALTERAÇÃO ##
 
+      // Este filtro de categoria é mantido para usos futuros,
+      // mas a HomePage agora utiliza a busca unificada acima.
       if (category != null && category.isNotEmpty) {
         query = query.eq('category', category);
       }
@@ -31,17 +32,17 @@ class RecipeRemoteDataSource {
 
       final response = await query.order('id', ascending: false);
 
-       if (kDebugMode) {
-        print('[RecipeRemoteDataSource.getAll] Received ${response
-            .length} items from Supabase.');
+      if (kDebugMode) {
+        print(
+            '[RecipeRemoteDataSource.getAll] Received ${response.length} items from Supabase.');
       }
 
       final List<Recipe> recipes = response.map((item) {
         try {
           final recipe = Recipe.fromMap(item);
           if (kDebugMode) {
-            print('[RecipeRemoteDataSource.getAll] Parsed Recipe: ${recipe
-                .name}');
+            print(
+                '[RecipeRemoteDataSource.getAll] Parsed Recipe: ${recipe.name}');
           }
           return recipe;
         } catch (e, stackTrace) {
@@ -72,15 +73,14 @@ class RecipeRemoteDataSource {
         print(
             '[RecipeRemoteDataSource.getAll Supabase StackTrace] $stackTrace');
       }
-      // Re-throw the error to be handled by the repository or UI layer
-      // You might want to wrap it in a custom exception type
       throw Exception('Failed to fetch recipes from Supabase: $error');
     }
   }
 
   Future<List> getFromCategory(String category) async {
     try {
-      final response = await _supabaseClient.from('recipes')
+      final response = await _supabaseClient
+          .from('recipes')
           .select()
           .eq('category', category);
       return response.map((data) => Recipe.fromMap(data)).toList();
@@ -92,11 +92,8 @@ class RecipeRemoteDataSource {
 
   Future<Recipe?> getById(int id) async {
     try {
-      final response = await _supabaseClient
-          .from('recipes')
-          .select()
-          .eq("id", id)
-          .single();
+      final response =
+      await _supabaseClient.from('recipes').select().eq("id", id).single();
       return Recipe.fromMap(response);
     } catch (e) {
       if (kDebugMode) {
@@ -109,17 +106,14 @@ class RecipeRemoteDataSource {
 
   Future<int?> create(Recipe recipe) async {
     try {
-      final dataToInsert = recipe.toMap()
-        ..remove('id')..remove("isFavorite");
+      final dataToInsert = recipe.toMap()..remove('id')..remove("isFavorite");
 
       final response = await _supabaseClient
           .from('recipes')
           .insert(dataToInsert)
           .select()
           .single();
-      return Recipe
-          .fromMap(response)
-          .id;
+      return Recipe.fromMap(response).id;
     } catch (e) {
       print('Erro ao criar receita: $e');
       throw Exception('Falha ao criar receita');
@@ -143,10 +137,7 @@ class RecipeRemoteDataSource {
 
   Future<void> delete(int id) async {
     try {
-      final response = await _supabaseClient
-          .from('recipes')
-          .delete()
-          .eq('id', id);
+      await _supabaseClient.from('recipes').delete().eq('id', id);
     } catch (e) {
       print('Erro ao deletar receita: $e');
       throw Exception('Falha ao deletar receita');
@@ -155,8 +146,8 @@ class RecipeRemoteDataSource {
 
   Future<List<String>> getCategories() async {
     try {
-      final response = await _supabaseClient.from('distinct_categories').select(
-          'category');
+      final response =
+      await _supabaseClient.from('distinct_categories').select('category');
       if (response.isEmpty) {
         return [];
       }
@@ -187,7 +178,8 @@ class RecipeRemoteDataSource {
         .match({'user_id': userId, 'recipe_id': recipeId});
   }
 
-  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) async {
+  Future<List<Recipe>> getFavoriteRecipes(
+      {int page = 0, int limit = 10}) async {
     final userId = _supabaseClient.auth.currentUser?.id;
     if (userId == null) throw 'Usuário não autenticado';
 
@@ -201,13 +193,12 @@ class RecipeRemoteDataSource {
         .order('created_at', ascending: false)
         .range(from, to);
 
-    final recipeIds = favoriteRelations.map((fav) => fav['recipe_id'] as int).toList();
+    final recipeIds =
+    favoriteRelations.map((fav) => fav['recipe_id'] as int).toList();
     if (recipeIds.isEmpty) return [];
 
-    final response = await _supabaseClient
-        .from('recipes')
-        .select()
-        .inFilter('id', recipeIds);
+    final response =
+    await _supabaseClient.from('recipes').select().inFilter('id', recipeIds);
 
     final recipes = response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
 
@@ -233,7 +224,10 @@ class RecipeRemoteDataSource {
     return response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
   }
 
-  Future<List<Recipe>> getUserRecipes({required String userId, required int page, required int limit}) async {
+  Future<List<Recipe>> getUserRecipes(
+      {required String userId,
+        required int page,
+        required int limit}) async {
     final from = page * limit;
     final to = from + limit - 1;
 

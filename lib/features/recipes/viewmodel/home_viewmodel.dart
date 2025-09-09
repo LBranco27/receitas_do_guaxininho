@@ -14,7 +14,7 @@ final favoriteRecipeIdsProvider = FutureProvider<Set<int>>((ref) async {
   final authState = ref.watch(authStateProvider);
 
   if (authState.valueOrNull == null) {
-  return {};
+    return {};
   }
 
   final repo = ref.watch(recipeRepositoryProvider);
@@ -27,30 +27,31 @@ class HomeState {
   final bool loading;
   final String? error;
   final String search;
-  final String? category;
-  final List<Recipe> recipes;
+  // O 'category' foi removido para dar lugar ao mapa de receitas
+  final Map<String, List<Recipe>> categorizedRecipes;
+  final List<String> categories; // Usado para manter a ordem na UI
 
   const HomeState({
     this.loading = false,
     this.error,
     this.search = '',
-    this.category,
-    this.recipes = const [],
+    this.categorizedRecipes = const {},
+    this.categories = const [],
   });
 
   HomeState copyWith({
     bool? loading,
     String? error,
     String? search,
-    String? category,
-    List<Recipe>? recipes,
+    Map<String, List<Recipe>>? categorizedRecipes,
+    List<String>? categories,
   }) {
     return HomeState(
       loading: loading ?? this.loading,
       error: error == '' ? null : (error ?? this.error),
       search: search ?? this.search,
-      category: category ?? this.category,
-      recipes: recipes ?? this.recipes,
+      categorizedRecipes: categorizedRecipes ?? this.categorizedRecipes,
+      categories: categories ?? this.categories,
     );
   }
 }
@@ -65,9 +66,10 @@ class HomeViewModel extends StateNotifier<HomeState> {
   Future<void> load() async {
     state = state.copyWith(loading: true, error: '');
     try {
+      // Busca todas as receitas, aplicando o filtro de busca se houver
       final recipes = await repo.getAll(
         search: state.search.isEmpty ? null : state.search,
-        category: state.category,
+        // O filtro de categoria foi removido da busca principal
       );
       final favoriteIds = await ref.read(favoriteRecipeIdsProvider.future);
 
@@ -75,17 +77,34 @@ class HomeViewModel extends StateNotifier<HomeState> {
         return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
       }).toList();
 
-      state = state.copyWith(loading: false, recipes: updatedRecipes);
+      // Agrupa as receitas por categoria
+      final newCategorizedRecipes = <String, List<Recipe>>{};
+      for (final recipe in updatedRecipes) {
+        (newCategorizedRecipes[recipe.category] ??= []).add(recipe);
+      }
+
+      // Cria uma lista ordenada com os nomes das categorias
+      final newCategories = newCategorizedRecipes.keys.toList()..sort();
+
+      state = state.copyWith(
+        loading: false,
+        categorizedRecipes: newCategorizedRecipes,
+        categories: newCategories,
+      );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
     }
   }
 
   void updateFavoritesState(Set<int> favoriteIds) {
-    final updatedRecipes = state.recipes.map((recipe) {
-      return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
-    }).toList();
-    state = state.copyWith(recipes: updatedRecipes);
+    final updatedCategorizedRecipes = <String, List<Recipe>>{};
+    state.categorizedRecipes.forEach((category, recipeList) {
+      final updatedList = recipeList.map((recipe) {
+        return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
+      }).toList();
+      updatedCategorizedRecipes[category] = updatedList;
+    });
+    state = state.copyWith(categorizedRecipes: updatedCategorizedRecipes);
   }
 
   Future<void> toggleFavorite(int recipeId, bool isCurrentlyFavorite) async {
@@ -108,10 +127,8 @@ class HomeViewModel extends StateNotifier<HomeState> {
     load();
   }
 
-  void setCategory(String? value) {
-    state = state.copyWith(category: value);
-    load();
-  }
+  // O método setCategory não é mais necessário
+  // void setCategory(String? value) { ... }
 
   Future<void> refresh() => load();
 }
@@ -132,4 +149,3 @@ final homeVmProvider = StateNotifierProvider<HomeViewModel, HomeState>((ref) {
 
   return vm;
 });
-
