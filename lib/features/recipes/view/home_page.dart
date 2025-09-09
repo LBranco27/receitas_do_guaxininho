@@ -18,6 +18,18 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   final _searchController = TextEditingController();
+  bool _showClearButton = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Adiciona um listener para mostrar/esconder o botão 'X'
+    _searchController.addListener(() {
+      setState(() {
+        _showClearButton = _searchController.text.isNotEmpty;
+      });
+    });
+  }
 
   @override
   void dispose() {
@@ -25,10 +37,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     super.dispose();
   }
 
-  // Função para centralizar a lógica de pesquisa ao clicar num chip
   void _performSearch(String query) {
     _searchController.text = query;
-    // Move o cursor para o final do texto
     _searchController.selection =
         TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
     ref.read(homeVmProvider.notifier).setSearch(query);
@@ -115,13 +125,25 @@ class _HomePageState extends ConsumerState<HomePage> {
             child: TextField(
               controller: _searchController,
               onChanged: vm.setSearch,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Buscar por nome ou categoria...',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
+                // ## INÍCIO DA ALTERAÇÃO ##
+                // Adiciona o botão 'X' (sufixo) apenas se houver texto
+                suffixIcon: _showClearButton
+                    ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    // O onChanged já é acionado ao limpar,
+                    // então a busca será atualizada automaticamente.
+                  },
+                )
+                    : null,
+                // ## FIM DA ALTERAÇÃO ##
               ),
             ),
           ),
-          // Widget com os balões de categoria
           _CategoryChips(
             categories: state.allAvailableCategories,
             onCategorySelected: _performSearch,
@@ -194,7 +216,6 @@ class _CategoryCarousel extends ConsumerWidget {
           height: 230,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            // Adiciona padding para o carrossel não colar nas bordas
             padding: const EdgeInsets.symmetric(horizontal: 12),
             itemCount: recipes.length,
             itemBuilder: (context, index) {
@@ -221,7 +242,6 @@ class _CategoryCarousel extends ConsumerWidget {
   }
 }
 
-// Widget auxiliar para construir a fileira de chips de categoria
 class _CategoryChips extends StatelessWidget {
   final List<String> categories;
   final Function(String) onCategorySelected;
@@ -276,20 +296,19 @@ class _CategoryChips extends StatelessWidget {
         onPressed: () async {
           await showModalBottomSheet(
             context: context,
-            isScrollControlled: true, // Permite ajustar a altura
+            isScrollControlled: true,
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             builder: (context) {
               return DraggableScrollableSheet(
                 expand: false,
-                initialChildSize: 0.4, // Altura inicial (40% da tela)
+                initialChildSize: 0.4,
                 minChildSize: 0.3,
                 maxChildSize: 0.6,
                 builder: (context, scrollController) {
                   return Column(
                     children: [
-                      // "Handle" para indicar que a sheet é arrastável
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
                         child: Container(

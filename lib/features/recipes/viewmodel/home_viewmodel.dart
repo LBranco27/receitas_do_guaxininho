@@ -73,7 +73,7 @@ class HomeViewModel extends StateNotifier<HomeState> {
       // Busca todas as categorias disponíveis apenas uma vez, na primeira carga
       if (state.allAvailableCategories.isEmpty) {
         final allCats = await repo.getCategories();
-        allCats.sort(); // Mantém a lista ordenada
+        allCats.sort();
         state = state.copyWith(allAvailableCategories: allCats);
       }
 
