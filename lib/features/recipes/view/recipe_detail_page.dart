@@ -116,18 +116,25 @@ class _RecipePageState extends ConsumerState<RecipePage> {
 
   void _toggleEditMode() {
     final recipeNotifier = ref.read(recipeDetailVmProvider(widget.id).notifier);
+
     setState(() {
       _isEditMode = !_isEditMode;
-      if (!_isEditMode) { // Just exited edit mode (saved)
-        // Create an updated Recipe object
-        // This requires parsing ingredients and steps from controllers
-        // And converting time/servings back to numeric if necessary
+
+      if (!_isEditMode) {
+        final currentRecipe = ref.read(recipeDetailVmProvider(widget.id)).recipe;
+        if (currentRecipe == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Erro: Não foi possível encontrar a receita para salvar.'))
+          );
+          return;
+        }
+
         Map<String, List<String>> parsedIngredients = {};
         final lines = _ingredientsController.text.split('\n');
         String currentCategory = '';
         for (var line in lines) {
-          if (line.endsWith(':')) {
-            currentCategory = line.substring(0, line.length -1);
+          if (line.trim().endsWith(':')) {
+            currentCategory = line.trim().substring(0, line.trim().length - 1);
             parsedIngredients[currentCategory] = [];
           } else if (currentCategory.isNotEmpty && line.trim().isNotEmpty) {
             parsedIngredients[currentCategory]?.add(line.trim());
@@ -135,25 +142,23 @@ class _RecipePageState extends ConsumerState<RecipePage> {
         }
 
         List<String> parsedSteps = _stepsController.text.split('\n').where((s) => s.trim().isNotEmpty).toList();
-        
-        // Update ViewModel state immediately for UI, then trigger save
-        recipeNotifier.updateTitle(_titleController.text);
-        recipeNotifier.updateTimeMinutes(_timeController.text); // ViewModel should parse
-        recipeNotifier.updateServings(_servingsController.text);   // ViewModel should parse
-        recipeNotifier.updateIngredientsText(_ingredientsController.text); // ViewModel can handle parsing
-        recipeNotifier.updateStepsText(_stepsController.text); // ViewModel can handle parsing
 
-        // Tell ViewModel to finalize and save the update
-        recipeNotifier.saveRecipe();
+        final updatedRecipe = currentRecipe.copyWith(
+          name: _titleController.text,
+          timeMinutes: int.tryParse(_timeController.text) ?? currentRecipe.timeMinutes,
+          servings: int.tryParse(_servingsController.text) ?? currentRecipe.servings,
+          ingredients: parsedIngredients,
+          steps: parsedSteps,
+        );
 
-      } else { // Just entered edit mode
-        // Reset fields to original widget values or current ViewModel state
-        // This ensures if a save failed or data was reloaded, edit fields are fresh
+        recipeNotifier.saveRecipe(updatedRecipe);
+
+      } else {
         final currentState = ref.read(recipeDetailVmProvider(widget.id));
         _titleController.text = currentState.recipe?.name ?? widget.title;
         _timeController.text = (currentState.recipe?.timeMinutes ?? widget.time.replaceAll(RegExp(r'[^0-9]'), '')).toString();
         _servingsController.text = (currentState.recipe?.servings ?? widget.servings.replaceAll(RegExp(r'[^0-9]'), '')).toString();
-        
+
         String ingredientsText = '';
         (currentState.recipe?.ingredients ?? widget.ingredients).forEach((category, items) {
           ingredientsText += '$category:\n';
