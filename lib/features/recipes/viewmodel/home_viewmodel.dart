@@ -155,6 +155,7 @@ final homeVmProvider = StateNotifierProvider<HomeViewModel, HomeState>((ref) {
 final categoriesProvider = Provider<List<String>>((ref) {
   return [
     'Acompanhamentos',
+    'Árabe',
     'Aperitivos',
     'Arroz e Risotos',
     'Aves',
@@ -180,6 +181,5 @@ final categoriesProvider = Provider<List<String>>((ref) {
     'Sobremesas',
     'Vegana',
     'Vegetariana',
-    'Árabe',
   ]..sort();
 });
