@@ -183,10 +183,15 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
                       category: _category.text,
                       timeMinutes: int.parse(_timeMinutes.text),
                       servings: int.parse(_servings.text),
-                      imagePath: _imageFile?.path,
+                      imagePath: null,
                     );
-                    await viewModel.create(recipe);
-                    if (mounted) Navigator.pop(context);
+                    await viewModel.create(recipe, _imageFile);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Receita criada com sucesso!')),
+                      );
+                      Navigator.pop(context);
+                    }
                   }
                 },
                 child: const Text('Salvar Receita'),

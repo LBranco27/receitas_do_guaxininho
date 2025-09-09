@@ -3,19 +3,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:receitas_do_guaxininho/features/auth/viewmodel/profile_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../viewmodel/recipe_detail_viewmodel.dart';
-import '../../../domain/entities/recipe.dart';
 
-import '../../comments/viewmodel/recipe_comments_viewmodel.dart';
 import '../../../domain/entities/comment.dart';
-import 'package:intl/intl.dart';
-
-// BEGIN: ADDED FOR REVIEWS
-import '../../reviews/viewmodel/recipe_reviews_viewmodel.dart';
+import '../../../domain/entities/recipe.dart';
 import '../../../domain/entities/review.dart' as app_review; // Aliased to avoid conflict
-// END: ADDED FOR REVIEWS
+import '../../comments/viewmodel/recipe_comments_viewmodel.dart';
+import '../../reviews/viewmodel/recipe_reviews_viewmodel.dart';
+import '../viewmodel/recipe_detail_viewmodel.dart';
 
 class RecipeDetailPage extends ConsumerWidget {
   final int id;
@@ -37,17 +35,16 @@ class RecipeDetailPage extends ConsumerWidget {
     }
 
     return RecipePage(
-      key: ValueKey(r.id),
-      id: r.id!,
-      title: r.name,
-      imagePath: r.imagePath ?? 'assets/images/placeholder.png',
-      time: '${r.timeMinutes} min',
-      servings: '${r.servings} pessoas',
-      ingredients: r.ingredients,
-      preparationSteps: r.steps,
-      isFavorite: r.isFavorite,
-      ownerId: r.owner
-    );
+        key: ValueKey(r.id),
+        id: r.id!,
+        title: r.name,
+        imagePath: r.imagePath ?? 'assets/images/placeholder.png',
+        time: '${r.timeMinutes} min',
+        servings: '${r.servings} pessoas',
+        ingredients: r.ingredients,
+        preparationSteps: r.steps,
+        isFavorite: r.isFavorite,
+        ownerId: r.owner);
   }
 }
 
@@ -75,12 +72,12 @@ class RecipePage extends ConsumerStatefulWidget {
     required this.ownerId,
   });
 
-
   @override
   ConsumerState<RecipePage> createState() => _RecipePageState();
 }
 
 class _RecipePageState extends ConsumerState<RecipePage> {
+  XFile? _newImageFile;
   bool _isEditMode = false;
   late TextEditingController _titleController;
   late TextEditingController _timeController;
@@ -88,11 +85,18 @@ class _RecipePageState extends ConsumerState<RecipePage> {
   late TextEditingController _ingredientsController;
   late TextEditingController _stepsController;
   late TextEditingController _commentController;
-
-  // BEGIN: ADDED FOR REVIEWS
   late TextEditingController _reviewTextController;
   double _currentRatingInput = 0; // For review input form
-  // END: ADDED FOR REVIEWS
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _newImageFile = image;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -112,17 +116,15 @@ class _RecipePageState extends ConsumerState<RecipePage> {
     _ingredientsController = TextEditingController(text: ingredientsText.trim());
     _stepsController = TextEditingController(text: widget.preparationSteps.join('\n'));
     _commentController = TextEditingController();
-
-    // BEGIN: ADDED FOR REVIEWS
     _reviewTextController = TextEditingController();
+
     // Initial fetch for current user's review if logged in
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final currentUserId = ref.read(supabaseClientProvider).auth.currentUser?.id;
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
       if (currentUserId != null && currentUserId.isNotEmpty) {
         ref.read(recipeReviewsProvider(widget.id).notifier).fetchCurrentUserReview(currentUserId);
       }
     });
-    // END: ADDED FOR REVIEWS
   }
 
   @override
@@ -133,9 +135,7 @@ class _RecipePageState extends ConsumerState<RecipePage> {
     _ingredientsController.dispose();
     _stepsController.dispose();
     _commentController.dispose();
-    // BEGIN: ADDED FOR REVIEWS
     _reviewTextController.dispose();
-    // END: ADDED FOR REVIEWS
     super.dispose();
   }
 
@@ -145,49 +145,70 @@ class _RecipePageState extends ConsumerState<RecipePage> {
 
   void _toggleEditMode() {
     final recipeNotifier = ref.read(recipeDetailVmProvider(widget.id).notifier);
-    setState(() {
-      _isEditMode = !_isEditMode;
-      if (!_isEditMode) { 
-        Map<String, List<String>> parsedIngredients = {};
-        final lines = _ingredientsController.text.split('\n');
-        String currentCategory = '';
-        for (var line in lines) {
-          if (line.endsWith(':')) {
-            currentCategory = line.substring(0, line.length -1);
-            parsedIngredients[currentCategory] = [];
-          } else if (currentCategory.isNotEmpty && line.trim().isNotEmpty) {
-            parsedIngredients[currentCategory]?.add(line.trim());
-          }
-        }
 
-        List<String> parsedSteps = _stepsController.text.split('\n').where((s) => s.trim().isNotEmpty).toList();
-        
-        recipeNotifier.updateTitle(_titleController.text);
-        recipeNotifier.updateTimeMinutes(_timeController.text); 
-        recipeNotifier.updateServings(_servingsController.text);   
-        recipeNotifier.updateIngredientsText(_ingredientsController.text); 
-        recipeNotifier.updateStepsText(_stepsController.text); 
-
-        recipeNotifier.saveRecipe();
-
-      } else { 
-        final currentState = ref.read(recipeDetailVmProvider(widget.id));
-        _titleController.text = currentState.recipe?.name ?? widget.title;
-        _timeController.text = (currentState.recipe?.timeMinutes ?? widget.time.replaceAll(RegExp(r'[^0-9]'), '')).toString();
-        _servingsController.text = (currentState.recipe?.servings ?? widget.servings.replaceAll(RegExp(r'[^0-9]'), '')).toString();
-        
-        String ingredientsText = '';
-        (currentState.recipe?.ingredients ?? widget.ingredients).forEach((category, items) {
-          ingredientsText += '$category:\n';
-          items.forEach((item) => ingredientsText += '  $item\n');
-          ingredientsText += '\n';
-        });
-        _ingredientsController.text = ingredientsText.trim();
-        _stepsController.text = (currentState.recipe?.steps ?? widget.preparationSteps).join('\n');
+    // Se estamos em modo de edição, significa que o usuário clicou para SALVAR.
+    if (_isEditMode) {
+      final currentRecipe = ref.read(recipeDetailVmProvider(widget.id)).recipe;
+      if (currentRecipe == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro: Não foi possível encontrar a receita para salvar.')));
+        return;
       }
-    });
+
+      // Lógica de parsing
+      Map<String, List<String>> parsedIngredients = {};
+      final lines = _ingredientsController.text.split('\n');
+      String currentCategory = '';
+      for (var line in lines) {
+        if (line.trim().endsWith(':')) {
+          currentCategory = line.trim().substring(0, line.trim().length - 1);
+          parsedIngredients[currentCategory] = [];
+        } else if (currentCategory.isNotEmpty && line.trim().isNotEmpty) {
+          parsedIngredients[currentCategory]?.add(line.trim());
+        }
+      }
+      List<String> parsedSteps = _stepsController.text.split('\n').where((s) => s.trim().isNotEmpty).toList();
+
+      final updatedRecipe = currentRecipe.copyWith(
+        name: _titleController.text,
+        timeMinutes: int.tryParse(_timeController.text) ?? currentRecipe.timeMinutes,
+        servings: int.tryParse(_servingsController.text) ?? currentRecipe.servings,
+        ingredients: parsedIngredients,
+        steps: parsedSteps,
+      );
+
+      // Chama o método para salvar, passando a nova imagem (se houver)
+      recipeNotifier.saveRecipe(updatedRecipe, _newImageFile);
+
+      // Atualiza a UI para sair do modo de edição
+      setState(() {
+        _isEditMode = false;
+        _newImageFile = null; // Limpa a imagem DEPOIS de salvar
+      });
+    } else {
+      // Se não estamos em modo de edição, significa que o usuário clicou para EDITAR.
+      final currentState = ref.read(recipeDetailVmProvider(widget.id));
+      _titleController.text = currentState.recipe?.name ?? widget.title;
+      _timeController.text = (currentState.recipe?.timeMinutes ?? '').toString();
+      _servingsController.text = (currentState.recipe?.servings ?? '').toString();
+
+      String ingredientsText = '';
+      (currentState.recipe?.ingredients ?? widget.ingredients).forEach((category, items) {
+        ingredientsText += '$category:\n';
+        for (var item in items) {
+          ingredientsText += '  $item\n';
+        }
+        ingredientsText += '\n';
+      });
+      _ingredientsController.text = ingredientsText.trim();
+      _stepsController.text = (currentState.recipe?.steps ?? widget.preparationSteps).join('\n');
+
+      setState(() {
+        _isEditMode = true;
+      });
+    }
   }
-  
+
   Future<void> _confirmDeleteRecipe() async {
     final recipeNotifier = ref.read(recipeDetailVmProvider(widget.id).notifier);
 
@@ -201,13 +222,13 @@ class _RecipePageState extends ConsumerState<RecipePage> {
             TextButton(
               child: const Text('Cancelar'),
               onPressed: () {
-                Navigator.of(dialogContext).pop(false); 
+                Navigator.of(dialogContext).pop(false);
               },
             ),
             TextButton(
               child: const Text('Excluir', style: TextStyle(color: Colors.redAccent)),
               onPressed: () {
-                Navigator.of(dialogContext).pop(true); 
+                Navigator.of(dialogContext).pop(true);
               },
             ),
           ],
@@ -218,19 +239,19 @@ class _RecipePageState extends ConsumerState<RecipePage> {
     if (confirmed == true) {
       await recipeNotifier.deleteCurrentRecipe();
       if (mounted) {
-        context.go('/'); 
+        context.go('/');
       }
     }
   }
 
   Widget _buildInfoChip(IconData icon, String label) {
-    final theme = Theme.of(context); 
+    final theme = Theme.of(context);
     return Chip(
       avatar: Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
       label: Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
       backgroundColor: Colors.transparent,
       elevation: 0,
-      visualDensity: VisualDensity.compact, 
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -248,12 +269,12 @@ class _RecipePageState extends ConsumerState<RecipePage> {
   }
 
   Widget _buildIngredientsSection() {
-    if (widget.ingredients.isEmpty && !_isEditMode) { 
+    if (widget.ingredients.isEmpty && !_isEditMode) {
       return const Text('Nenhum ingrediente listado.', style: TextStyle(fontStyle: FontStyle.italic));
     }
     List<Widget> ingredientWidgets = [];
-    
-    if(!_isEditMode) {
+
+    if (!_isEditMode) {
       widget.ingredients.forEach((category, items) {
         ingredientWidgets.add(
           Padding(
@@ -284,7 +305,7 @@ class _RecipePageState extends ConsumerState<RecipePage> {
   }
 
   Widget _buildStepsSection() {
-    if (widget.preparationSteps.isEmpty && !_isEditMode) { 
+    if (widget.preparationSteps.isEmpty && !_isEditMode) {
       return const Text('Nenhum passo listado.', style: TextStyle(fontStyle: FontStyle.italic));
     }
     if (!_isEditMode) {
@@ -303,7 +324,105 @@ class _RecipePageState extends ConsumerState<RecipePage> {
         }).toList(),
       );
     }
-    return Container(); 
+    return Container();
+  }
+
+  Widget _buildImageSection(RecipeDetailState currentRecipeState) {
+    final currentImage = currentRecipeState.recipe?.imagePath;
+
+    if (_isEditMode) {
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12.0),
+            child: _newImageFile != null
+                ? Image.file(
+              File(_newImageFile!.path),
+              height: 250,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            )
+                : (currentImage != null && currentImage.isNotEmpty
+                ? Image.network(
+              currentImage,
+              height: 250,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            )
+                : Container(
+              height: 250,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.photo_camera, color: Colors.grey[600], size: 50),
+            )),
+          ),
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: FloatingActionButton(
+              onPressed: _pickImage,
+              mini: true,
+              child: const Icon(Icons.edit),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (currentImage != null && currentImage.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12.0),
+        child: Image.network(
+          currentImage,
+          height: 250,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              height: 250,
+              width: double.infinity,
+              color: Colors.grey[300],
+              child: Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                      : null,
+                ),
+              ),
+            );
+          },
+          errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
+            if (kDebugMode) {
+              print('Error loading network image: $currentImage, Exception: $exception');
+            }
+            return Container(
+              height: 250,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.broken_image, color: Colors.grey[600], size: 50),
+            );
+          },
+        ),
+      );
+    }
+
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(Icons.photo_camera, color: Colors.grey[600], size: 50),
+    );
   }
 
   Widget _buildCommentsSection(String currentUserId) {
@@ -321,7 +440,8 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                 if (comments.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16.0),
-                    child: Text('Nenhum comentário ainda. Seja o primeiro!', style: TextStyle(fontStyle: FontStyle.italic)),
+                    child: Text('Nenhum comentário ainda. Seja o primeiro!',
+                        style: TextStyle(fontStyle: FontStyle.italic)),
                   )
                 else
                   ListView.builder(
@@ -330,7 +450,10 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                     itemCount: comments.length,
                     itemBuilder: (context, index) {
                       final comment = comments[index];
-                      return _CommentItem(comment: comment, currentUserId: currentUserId, recipeId: widget.id.toString());
+                      return _CommentItem(
+                          comment: comment,
+                          currentUserId: currentUserId,
+                          recipeId: widget.id.toString());
                     },
                   ),
                 const SizedBox(height: 16),
@@ -365,23 +488,23 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                     ],
                   )
                 else
-                   Padding(
-                     padding: const EdgeInsets.symmetric(vertical: 16.0),
-                     child: Text('Você precisa estar logado para comentar.', style: TextStyle(fontStyle: FontStyle.italic, color: theme.colorScheme.onSurfaceVariant)),
-                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Text('Você precisa estar logado para comentar.',
+                        style: TextStyle(
+                            fontStyle: FontStyle.italic, color: theme.colorScheme.onSurfaceVariant)),
+                  ),
               ],
             );
           },
-          loading: () => const Center(child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: CircularProgressIndicator(),
-          )),
+          loading: () => const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator())),
           error: (error, stackTrace) {
             if (kDebugMode) {
               print('[CommentsSection Error] $error');
-              print('[CommentsSection StackTrace] $stackTrace');
             }
-            return Center(child: Text('Erro ao carregar comentários: ${error.toString()}', style: TextStyle(color: theme.colorScheme.error)));
+            return Center(
+                child: Text('Erro ao carregar comentários: ${error.toString()}',
+                    style: TextStyle(color: theme.colorScheme.error)));
           },
         ),
       ],
@@ -390,109 +513,104 @@ class _RecipePageState extends ConsumerState<RecipePage> {
 
   void _postComment(String currentUserId) {
     if (_commentController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Comentário não pode estar vazio.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Comentário não pode estar vazio.')));
       return;
     }
     if (currentUserId.isEmpty) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Você precisa estar logado para comentar.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Você precisa estar logado para comentar.')));
       return;
     }
 
-    ref.read(recipeCommentsProvider(widget.id.toString()).notifier).addComment(
+    ref
+        .read(recipeCommentsProvider(widget.id.toString()).notifier)
+        .addComment(
       recipeId: widget.id.toString(),
       userId: currentUserId,
       text: _commentController.text.trim(),
-    ).then((_) {
+    )
+        .then((_) {
       _commentController.clear();
       FocusScope.of(context).unfocus();
     }).catchError((e) {
       if (kDebugMode) {
         print('Error posting comment from UI: $e');
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Falha ao postar comentário: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Falha ao postar comentário: ${e.toString()}')));
     });
   }
 
-  // BEGIN: ADDED FOR REVIEWS
   Widget _buildReviewsSection(String currentUserId) {
     final reviewsState = ref.watch(recipeReviewsProvider(widget.id));
     final theme = Theme.of(context);
 
-    // Update form if current user's review is loaded
     ref.listen<RecipeReviewsState>(recipeReviewsProvider(widget.id), (_, next) {
       if (next.currentUserReview != null && next.currentUserReview!.id.isNotEmpty) {
-        if (_currentRatingInput != next.currentUserReview!.rating.toDouble() || _reviewTextController.text != (next.currentUserReview!.text ?? '')) {
-            setState(() {
-              _currentRatingInput = next.currentUserReview!.rating.toDouble();
-              _reviewTextController.text = next.currentUserReview!.text ?? '';
-            });
+        if (_currentRatingInput != next.currentUserReview!.rating.toDouble() ||
+            _reviewTextController.text != (next.currentUserReview!.text ?? '')) {
+          setState(() {
+            _currentRatingInput = next.currentUserReview!.rating.toDouble();
+            _reviewTextController.text = next.currentUserReview!.text ?? '';
+          });
         }
-      } else { // No review or review was deleted
-         if (_currentRatingInput != 0 || _reviewTextController.text.isNotEmpty) {
-           setState(() {
-             _currentRatingInput = 0;
-             _reviewTextController.clear();
-           });
-         }
+      } else {
+        if (_currentRatingInput != 0 || _reviewTextController.text.isNotEmpty) {
+          setState(() {
+            _currentRatingInput = 0;
+            _reviewTextController.clear();
+          });
+        }
       }
     });
-
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Avaliações'),
-        
-        // Average Rating Display
         reviewsState.averageRating.when(
           data: (avgRating) => avgRating != null
               ? Row(
-                  children: [
-                    _RatingStars(rating: avgRating, size: 24, color: Colors.amber),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${avgRating.toStringAsFixed(1)} de 5 estrelas',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '(${reviewsState.reviews.asData?.value.length ?? 0} avaliações)',
-                       style: theme.textTheme.bodySmall,
-                    )
-                  ],
-                )
+            children: [
+              _RatingStars(rating: avgRating, size: 24, color: Colors.amber),
+              const SizedBox(width: 8),
+              Text(
+                '${avgRating.toStringAsFixed(1)} de 5 estrelas',
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '(${reviewsState.reviews.asData?.value.length ?? 0} avaliações)',
+                style: theme.textTheme.bodySmall,
+              )
+            ],
+          )
               : const Text('Nenhuma avaliação ainda.', style: TextStyle(fontStyle: FontStyle.italic)),
-          loading: () => const SizedBox(height: 24, child: Center(child: SizedBox(width:20, height:20, child: CircularProgressIndicator(strokeWidth: 2,)))),
-          error: (e, st) => Text('Erro ao carregar média.', style: TextStyle(color: theme.colorScheme.error)),
+          loading: () => const SizedBox(
+              height: 24, child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
+          error: (e, st) =>
+              Text('Erro ao carregar média.', style: TextStyle(color: theme.colorScheme.error)),
         ),
         const SizedBox(height: 16),
-
-        // Review Input/Edit Section
         if (currentUserId.isNotEmpty)
           _buildReviewInputSection(currentUserId, reviewsState.currentUserReview)
         else
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Text('Você precisa estar logado para avaliar.', style: TextStyle(fontStyle: FontStyle.italic, color: theme.colorScheme.onSurfaceVariant)),
+            child: Text('Você precisa estar logado para avaliar.',
+                style: TextStyle(fontStyle: FontStyle.italic, color: theme.colorScheme.onSurfaceVariant)),
           ),
-        
         const SizedBox(height: 16),
         Text("Todas as Avaliações:", style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
-
-        // List of Reviews
         reviewsState.reviews.when(
           data: (reviewsList) {
             if (reviewsList.isEmpty) {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 16.0),
-                child: Text('Nenhuma avaliação ainda.', style: TextStyle(fontStyle: FontStyle.italic)),
+                child:
+                Text('Nenhuma avaliação ainda.', style: TextStyle(fontStyle: FontStyle.italic)),
               );
             }
             return ListView.builder(
@@ -505,16 +623,14 @@ class _RecipePageState extends ConsumerState<RecipePage> {
               },
             );
           },
-          loading: () => const Center(child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: CircularProgressIndicator(),
-          )),
+          loading: () => const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator())),
           error: (error, stackTrace) {
             if (kDebugMode) {
               print('[ReviewsSection Error] $error');
-              print('[ReviewsSection StackTrace] $stackTrace');
             }
-            return Center(child: Text('Erro ao carregar avaliações: ${error.toString()}', style: TextStyle(color: theme.colorScheme.error)));
+            return Center(
+                child: Text('Erro ao carregar avaliações: ${error.toString()}',
+                    style: TextStyle(color: theme.colorScheme.error)));
           },
         ),
       ],
@@ -533,7 +649,8 @@ class _RecipePageState extends ConsumerState<RecipePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(isEditing ? 'Edite sua Avaliação' : 'Deixe sua Avaliação', style: theme.textTheme.titleMedium),
+            Text(isEditing ? 'Edite sua Avaliação' : 'Deixe sua Avaliação',
+                style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -576,7 +693,8 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                           title: const Text('Excluir Avaliação?'),
                           content: const Text('Tem certeza que deseja excluir sua avaliação?'),
                           actions: [
-                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+                            TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
                             TextButton(
                               onPressed: () => Navigator.of(ctx).pop(true),
                               child: Text('Excluir', style: TextStyle(color: theme.colorScheme.error)),
@@ -586,18 +704,14 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                       );
                       if (confirmed == true) {
                         try {
-                          await ref.read(recipeReviewsProvider(widget.id).notifier).deleteCurrentUserReview();
-                          setState(() { // Reset form
-                            _currentRatingInput = 0;
-                            _reviewTextController.clear();
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Avaliação excluída.'), duration: Duration(seconds: 2)),
-                          );
+                          await ref
+                              .read(recipeReviewsProvider(widget.id).notifier)
+                              .deleteCurrentUserReview();
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                              content: Text('Avaliação excluída.'), duration: Duration(seconds: 2)));
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Erro ao excluir: ${e.toString()}')),
-                          );
+                              SnackBar(content: Text('Erro ao excluir: ${e.toString()}')));
                         }
                       }
                     },
@@ -605,11 +719,14 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                   ),
                 const Spacer(),
                 ElevatedButton(
-                  onPressed: (_currentRatingInput == 0) ? null : () { // Disable if no rating
+                  onPressed: (_currentRatingInput == 0)
+                      ? null
+                      : () {
                     _submitReview(currentUserId);
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
-                  child: Text(isEditing ? 'Atualizar' : 'Enviar', style: TextStyle(color: theme.colorScheme.onPrimary)),
+                  child: Text(isEditing ? 'Atualizar' : 'Enviar',
+                      style: TextStyle(color: theme.colorScheme.onPrimary)),
                 ),
               ],
             ),
@@ -621,161 +738,121 @@ class _RecipePageState extends ConsumerState<RecipePage> {
 
   void _submitReview(String currentUserId) {
     if (_currentRatingInput == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, selecione uma classificação de estrelas.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Por favor, selecione uma classificação de estrelas.')));
       return;
     }
     final reviewNotifier = ref.read(recipeReviewsProvider(widget.id).notifier);
-    reviewNotifier.addOrUpdateReview(
+    reviewNotifier
+        .addOrUpdateReview(
       userId: currentUserId,
       rating: _currentRatingInput.toInt(),
       text: _reviewTextController.text.trim().isEmpty ? null : _reviewTextController.text.trim(),
-    ).then((_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Avaliação enviada!')),
-      );
-      // Form reset is handled by the ref.listen in _buildReviewsSection
+    )
+        .then((_) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Avaliação enviada!')));
       FocusScope.of(context).unfocus();
     }).catchError((e) {
       if (kDebugMode) {
         print('Error submitting review from UI: $e');
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Falha ao enviar avaliação: ${e.toString()}')),
-      );
+          SnackBar(content: Text('Falha ao enviar avaliação: ${e.toString()}')));
     });
   }
-  // END: ADDED FOR REVIEWS
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currentRecipeState = ref.watch(recipeDetailVmProvider(widget.id));
-    final displayTitle = _isEditMode ? _titleController.text : (currentRecipeState.recipe?.name ?? widget.title);
+    final displayTitle =
+    _isEditMode ? _titleController.text : (currentRecipeState.recipe?.name ?? widget.title);
     final recipe = currentRecipeState.recipe;
-    final ownerId = widget.ownerId; 
+    final ownerId = widget.ownerId;
     final isFavorited = recipe?.isFavorite ?? widget.isFavorite;
-    final _supabaseClient = Supabase.instance.client;
-    final currentUserId = _supabaseClient.auth.currentUser?.id ?? '';
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
     final bool isOwner = currentUserId.isNotEmpty && ownerId != null && ownerId == currentUserId;
-
     final ownerProfileAsyncValue = ownerId != null ? ref.watch(anyUserProfileProvider(ownerId)) : null;
 
     return Scaffold(
       appBar: AppBar(
         title: _isEditMode
             ? TextField(
-                controller: _titleController,
-                style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 20),
-                decoration: InputDecoration(
-                  hintText: 'Nome da Receita',
-                  hintStyle: TextStyle(color: theme.colorScheme.onSurface.withAlpha(150)),
-                  border: InputBorder.none,
-                ),
-              )
+          controller: _titleController,
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 20),
+          decoration: InputDecoration(
+            hintText: 'Nome da Receita',
+            hintStyle: TextStyle(color: theme.colorScheme.onSurface.withAlpha(150)),
+            border: InputBorder.none,
+          ),
+        )
             : Text(displayTitle),
-        actions: [
-          if (ownerId != null && ownerProfileAsyncValue != null)
-            ownerProfileAsyncValue.when(
-              data: (profileData) {
-                if (profileData == null) return const SizedBox.shrink();
-                final avatarUrl = profileData['avatar_url'] as String?;
-                return IconButton(
-                  icon: CircleAvatar(
-                    backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: (avatarUrl == null || avatarUrl.isEmpty)
-                        ? const Icon(Icons.person)
-                        : null,
-                  ),
-                  onPressed: () {
-                    context.push('/user/$ownerId');
-                  },
-                );
-              },
-              loading: () => const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-              ),
-              error: (err, stack) => IconButton(
-                icon: const Icon(Icons.error),
-                onPressed: () {
-                   context.push('/user/$ownerId');
-                },
-              ),
-            ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            if (widget.imagePath != null && widget.imagePath!.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12.0),
-                child: Image.network( widget.imagePath!,
-                        height: 250,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            height: 250,
-                            width: double.infinity,
-                            color: Colors.grey[300],
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
-                          if (kDebugMode) {
-                            print('Error loading network image: ${widget.imagePath}, Exception: $exception');
-                          }
-                          return Container(
-                            height: 250,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(12), 
-                            ),
-                            child: Icon(Icons.broken_image, color: Colors.grey[600], size: 50),
-                          );
-                        },
-                      ),
-              ),
-            if (widget.imagePath == null || widget.imagePath!.isEmpty)
-              Container( 
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.photo_camera, color: Colors.grey[600], size: 50),
-              ),
+            _buildImageSection(currentRecipeState),
             const SizedBox(height: 16),
-            if (!_isEditMode) 
+            if (!_isEditMode)
               Text(
                 displayTitle,
                 style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
-            Padding( 
+            if (ownerId != null && ownerProfileAsyncValue != null && !_isEditMode) ...[
+              const SizedBox(height: 8),
+              ownerProfileAsyncValue.when(
+                data: (profileData) {
+                  if (profileData == null) return const SizedBox.shrink();
+
+                  final username = profileData['name'] as String? ?? 'Usuário';
+                  final avatarUrl = profileData['avatar_url'] as String?;
+
+                  return InkWell(
+                    onTap: () => context.push('/user/$ownerId'),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 15,
+                            backgroundImage:
+                            (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+                            child: (avatarUrl == null || avatarUrl.isEmpty)
+                                ? const Icon(Icons.person, size: 16)
+                                : null,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Por $username',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(color: Theme.of(context).colorScheme.secondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12.0),
+                    child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                error: (err, stack) => const SizedBox.shrink(),
+              ),
+            ],
+            Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Row(
                 children: <Widget>[
                   if (!_isEditMode)
-                    _buildInfoChip(Icons.timer_outlined, widget.time) 
+                    _buildInfoChip(Icons.timer_outlined, widget.time)
                   else
                     SizedBox(
-                      width: 100, 
+                      width: 100,
                       child: TextField(
                         controller: _timeController,
                         decoration: const InputDecoration(labelText: 'Tempo (min)', border: InputBorder.none),
@@ -784,10 +861,10 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                     ),
                   const SizedBox(width: 16.0),
                   if (!_isEditMode)
-                    _buildInfoChip(Icons.restaurant_outlined, widget.servings) 
+                    _buildInfoChip(Icons.restaurant_outlined, widget.servings)
                   else
                     SizedBox(
-                      width: 100, 
+                      width: 100,
                       child: TextField(
                         controller: _servingsController,
                         decoration: const InputDecoration(labelText: 'Porções', border: InputBorder.none),
@@ -812,7 +889,7 @@ class _RecipePageState extends ConsumerState<RecipePage> {
             if (!_isEditMode)
               _buildIngredientsSection()
             else
-              TextField( 
+              TextField(
                 controller: _ingredientsController,
                 maxLines: 10,
                 decoration: const InputDecoration(
@@ -825,7 +902,7 @@ class _RecipePageState extends ConsumerState<RecipePage> {
             if (!_isEditMode)
               _buildStepsSection()
             else
-              TextField( 
+              TextField(
                 controller: _stepsController,
                 maxLines: 10,
                 decoration: const InputDecoration(
@@ -834,28 +911,24 @@ class _RecipePageState extends ConsumerState<RecipePage> {
                   border: OutlineInputBorder(),
                 ),
               ),
-            
-            // BEGIN: ADDED FOR REVIEWS
-            if (!_isEditMode)
+            if (!_isEditMode) ...[
               _buildReviewsSection(currentUserId),
-            // END: ADDED FOR REVIEWS
-            
-            if (!_isEditMode)
-               _buildCommentsSection(currentUserId),
-
-            if (_isEditMode) ...[ 
-              const SizedBox(height: 24), 
-              Center( 
+              _buildCommentsSection(currentUserId),
+            ],
+            if (_isEditMode) ...[
+              const SizedBox(height: 24),
+              Center(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent, 
+                    backgroundColor: Colors.redAccent,
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   ),
-                  onPressed: _confirmDeleteRecipe, 
-                  child: const Text('Excluir Receita', style: TextStyle(fontSize: 16, color: Colors.white)),
+                  onPressed: _confirmDeleteRecipe,
+                  child:
+                  const Text('Excluir Receita', style: TextStyle(fontSize: 16, color: Colors.white)),
                 ),
               ),
-              const SizedBox(height: 16), 
+              const SizedBox(height: 16),
             ],
           ],
         ),
@@ -881,7 +954,7 @@ class _CommentItem extends ConsumerWidget {
     final bool isAuthor = comment.userId == currentUserId;
     final authorProfileAsync = ref.watch(anyUserProfileProvider(comment.userId));
 
-    return Card( 
+    return Card(
       margin: const EdgeInsets.symmetric(vertical: 6.0),
       elevation: 1.5,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
@@ -895,14 +968,13 @@ class _CommentItem extends ConsumerWidget {
                 authorProfileAsync.when(
                   data: (profileData) {
                     final avatarUrl = profileData?['avatar_url'] as String?;
-                    final userName = profileData?['name'] as String? ?? 'Usuário Anônimo'; // Corrected
+                    final userName = profileData?['name'] as String? ?? 'Usuário Anônimo';
                     return Row(
                       children: [
                         CircleAvatar(
                           radius: 18,
-                          backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                              ? NetworkImage(avatarUrl)
-                              : null,
+                          backgroundImage:
+                          (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
                           child: (avatarUrl == null || avatarUrl.isEmpty)
                               ? const Icon(Icons.person, size: 18)
                               : null,
@@ -915,8 +987,15 @@ class _CommentItem extends ConsumerWidget {
                       ],
                     );
                   },
-                  loading: () => const SizedBox(height:36, child: Row(children:[CircleAvatar(radius:18), SizedBox(width:8), Text("Carregando...")])),
-                  error: (e, st) => Row(children:[const CircleAvatar(radius:18, child: Icon(Icons.error, size:18)), SizedBox(width:8), Text(comment.userName ?? 'Usuário Anônimo', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold))]),
+                  loading: () => const SizedBox(
+                      height: 36,
+                      child: Row(children: [CircleAvatar(radius: 18), SizedBox(width: 8), Text("Carregando...")])),
+                  error: (e, st) => Row(children: [
+                    const CircleAvatar(radius: 18, child: Icon(Icons.error, size: 18)),
+                    const SizedBox(width: 8),
+                    Text(comment.userName ?? 'Usuário Anônimo',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold))
+                  ]),
                 ),
                 const Spacer(),
                 Text(
@@ -931,13 +1010,14 @@ class _CommentItem extends ConsumerWidget {
                     constraints: const BoxConstraints(),
                     tooltip: 'Excluir comentário',
                     onPressed: () async {
-                      final confirmed = await showDialog<bool>( 
+                      final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           title: const Text('Excluir Comentário?'),
                           content: const Text('Tem certeza que deseja excluir este comentário?'),
                           actions: [
-                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+                            TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
                             TextButton(
                               onPressed: () => Navigator.of(ctx).pop(true),
                               child: Text('Excluir', style: TextStyle(color: theme.colorScheme.error)),
@@ -947,14 +1027,15 @@ class _CommentItem extends ConsumerWidget {
                       );
                       if (confirmed == true) {
                         try {
-                           await ref.read(recipeCommentsProvider(recipeId).notifier).deleteComment(commentId: comment.id);
-                           ScaffoldMessenger.of(context).showSnackBar(
-                             const SnackBar(content: Text('Comentário excluído.'), duration: Duration(seconds: 2)),
-                           );
+                          await ref
+                              .read(recipeCommentsProvider(recipeId).notifier)
+                              .deleteComment(commentId: comment.id);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                              content: Text('Comentário excluído.'), duration: Duration(seconds: 2)));
                         } catch (e) {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                             SnackBar(content: Text('Erro ao excluir: ${e.toString()}'), duration: Duration(seconds: 2)),
-                           );
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('Erro ao excluir: ${e.toString()}'),
+                              duration: const Duration(seconds: 2)));
                         }
                       }
                     },
@@ -974,7 +1055,6 @@ class _CommentItem extends ConsumerWidget {
   }
 }
 
-// BEGIN: ADDED FOR REVIEWS
 class _RatingStars extends StatelessWidget {
   final double rating;
   final double size;
@@ -1002,9 +1082,9 @@ class _RatingStars extends StatelessWidget {
 }
 
 class _ReviewItem extends ConsumerWidget {
-  final app_review.Review review; // Use alias
+  final app_review.Review review;
   final String currentUserId;
-  final int recipeId; // recipeId is int
+  final int recipeId;
 
   const _ReviewItem({
     required this.review,
@@ -1032,14 +1112,13 @@ class _ReviewItem extends ConsumerWidget {
                 authorProfileAsync.when(
                   data: (profileData) {
                     final avatarUrl = profileData?['avatar_url'] as String?;
-                    final userName = profileData?['name'] as String? ?? 'Usuário Anônimo'; // Corrected
+                    final userName = profileData?['name'] as String? ?? 'Usuário Anônimo';
                     return Row(
                       children: [
                         CircleAvatar(
                           radius: 18,
-                          backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                              ? NetworkImage(avatarUrl)
-                              : null,
+                          backgroundImage:
+                          (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
                           child: (avatarUrl == null || avatarUrl.isEmpty)
                               ? const Icon(Icons.person, size: 18)
                               : null,
@@ -1052,16 +1131,23 @@ class _ReviewItem extends ConsumerWidget {
                       ],
                     );
                   },
-                  loading: () => const SizedBox(height:36, child: Row(children:[CircleAvatar(radius:18), SizedBox(width:8), Text("Carregando...")])),
-                  error: (e, st) => Row(children:[const CircleAvatar(radius:18, child: Icon(Icons.error, size:18)), SizedBox(width:8), Text(review.userName ?? 'Usuário Anônimo', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold))]),
+                  loading: () => const SizedBox(
+                      height: 36,
+                      child: Row(children: [CircleAvatar(radius: 18), SizedBox(width: 8), Text("Carregando...")])),
+                  error: (e, st) => Row(children: [
+                    const CircleAvatar(radius: 18, child: Icon(Icons.error, size: 18)),
+                    const SizedBox(width: 8),
+                    Text(review.userName ?? 'Usuário Anônimo',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold))
+                  ]),
                 ),
                 const Spacer(),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                     _RatingStars(rating: review.rating.toDouble(), size: 16),
-                     const SizedBox(height: 4),
-                     Text(
+                    _RatingStars(rating: review.rating.toDouble(), size: 16),
+                    const SizedBox(height: 4),
+                    Text(
                       DateFormat('dd/MM/yy HH:mm').format(review.createdAt.toLocal()),
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
@@ -1082,4 +1168,3 @@ class _ReviewItem extends ConsumerWidget {
     );
   }
 }
-// END: ADDED FOR REVIEWS

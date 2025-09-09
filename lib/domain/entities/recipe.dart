@@ -61,7 +61,6 @@ class Recipe {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'name': name,
       'description': description,
       'owner': owner,
@@ -70,7 +69,6 @@ class Recipe {
       'category': category,
       'timeMinutes': timeMinutes,
       'servings': servings,
-      'isFavorite': isFavorite ? 1 : 0,
       'imagePath': imagePath,
     };
   }

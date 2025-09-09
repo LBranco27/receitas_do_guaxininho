@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../domain/repositories/recipe_repository.dart';
+import '../../../data/repositories/storage_repository.dart';
 import 'home_viewmodel.dart';
 import '../../profile/viewmodel/favorite_recipes_viewmodel.dart'; // Assuming this provides recipeRepositoryProvider
 
@@ -29,10 +32,11 @@ class RecipeDetailState {
 
 class RecipeDetailViewModel extends StateNotifier<RecipeDetailState> {
   final RecipeRepository repo;
+  final StorageRepository storageRepo;
   final int id;
   final Ref ref;
 
-  RecipeDetailViewModel(this.repo, this.id, this.ref)
+  RecipeDetailViewModel(this.repo, this.storageRepo, this.id, this.ref)
       : super(const RecipeDetailState());
 
   void updateFavoriteState(bool isFavorite) {
@@ -81,56 +85,33 @@ class RecipeDetailViewModel extends StateNotifier<RecipeDetailState> {
     }
   }
 
-  // Methods to update temporary edit state in ViewModel (if managing edit fields here)
-  void updateTitle(String title) {
-    // state = state.copyWith(editedTitle: title);
-  }
-
-  void updateTimeMinutes(String time) {
-    // state = state.copyWith(editedTimeMinutes: time);
-  }
-
-  void updateServings(String servings) {
-    // state = state.copyWith(editedServings: servings);
-  }
-
-  void updateIngredientsText(String ingredientsText) {
-    // state = state.copyWith(editedIngredientsText: ingredientsText);
-  }
-
-  void updateStepsText(String stepsText) {
-    // state = state.copyWith(editedStepsText: stepsText);
-  }
-
-  Future<void> saveRecipe() async {
-    if (state.recipe == null || state.recipe!.id == null) {
-      state = state.copyWith(error: "Nenhuma receita para salvar.");
+  Future<void> saveRecipe(Recipe updatedRecipe, XFile? newImageFile) async {
+    if (state.recipe == null) {
+      state = state.copyWith(error: "Receita original não encontrada para salvar.");
       return;
     }
-    // This is where you would construct the updatedRecipe from the state fields
-    // that were presumably updated by updateTitle, updateTimeMinutes, etc.
-    // Or, if the RecipePage is passing the complete updated Recipe object, use that.
-    // For now, let's assume the RecipePage prepares the Recipe and we just need to call update.
-    // A more robust implementation would involve the ViewModel building the Recipe.
 
-    // This method is called from RecipePage after it has called individual updateX methods.
-    // Those updateX methods are currently stubs.
-    // The logic in RecipePage's _toggleEditMode currently prepares an updated Recipe
-    // and calls this saveRecipe function, but doesn't pass the recipe.
-    // This indicates a design gap to be filled: either pass recipe to saveRecipe,
-    // or have updateX methods store changes in ViewModel state and saveRecipe uses that.
-
-    // As a placeholder, we just reload. The actual update logic needs to be correctly implemented.
-    print("RecipeDetailViewModel: saveRecipe() called. Actual update logic needs implementation using repo.update().");
+    state = state.copyWith(loading: true, error: '');
     try {
-        state = state.copyWith(loading: true, error: '');
-        // Example: if state.recipe was already updated to the new values:
-        // await repo.update(state.recipe!);
-        // Or if RecipePage passed the updated recipe:
-        // await repo.update(updatedRecipeFromPage);
-        await load(); // Reload data after attempting save
+      String? finalImagePath = updatedRecipe.imagePath;
+
+      if (newImageFile != null) {
+        final imageUrl = await storageRepo.uploadRecipeImage(
+          file: File(newImageFile.path),
+          userId: updatedRecipe.owner!,
+        );
+        finalImagePath = imageUrl;
+      }
+
+      final recipeToSave = updatedRecipe.copyWith(imagePath: finalImagePath);
+
+      await repo.update(recipeToSave);
+
+      state = state.copyWith(loading: false, recipe: recipeToSave);
+
+      ref.invalidate(homeVmProvider);
     } catch (e) {
-        state = state.copyWith(loading: false, error: "Erro ao salvar receita: ${e.toString()}");
+      state = state.copyWith(loading: false, error: "Erro ao salvar receita: ${e.toString()}");
     }
   }
 
@@ -154,7 +135,8 @@ final recipeDetailVmProvider =
 StateNotifierProvider.family<RecipeDetailViewModel, RecipeDetailState, int>(
         (ref, id) {
       final repo = ref.watch(recipeRepositoryProvider);
-      final vm = RecipeDetailViewModel(repo, id, ref)
+      final storageRepo = ref.watch(storageRepositoryProvider);
+      final vm = RecipeDetailViewModel(repo, storageRepo, id, ref)
         ..load();
 
       ref.listen(favoriteRecipeIdsProvider, (previous, next) {

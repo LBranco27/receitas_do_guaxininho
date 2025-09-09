@@ -130,8 +130,7 @@ class RecipeRemoteDataSource {
     try {
       final response = await _supabaseClient
           .from('recipes')
-          .update(recipe.toMap()
-          ..remove('id'))..remove("isFavorite")
+          .update(recipe.toMap())
           .eq('id', recipe.id as Object)
           .select()
           .single();

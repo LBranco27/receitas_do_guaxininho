@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -41,66 +40,57 @@ class RecipeCard extends StatelessWidget {
                     ? const ColoredBox(color: Color(0x11000000))
                     : Image.network(
                   imagePath!,
-                  height: 250,
-                  width: double.infinity,
                   fit: BoxFit.cover,
-                  loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      height: 250,
-                      width: double.infinity,
-                      color: Colors.grey[300],
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: progress.expectedTotalBytes != null
+                            ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                            : null,
                       ),
                     );
                   },
-                  errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
-                    if (kDebugMode) {
-                      print('Error loading network image: $imagePath, Exception: $exception');
-                    }
-                    return Container(
-                      height: 250,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(12), // Match your style
-                      ),
-                      child: Icon(Icons.broken_image, color: Colors.grey[600], size: 50),
-                    );
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(Icons.broken_image, size: 40, color: Colors.grey);
                   },
-
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 2, 8, 0),
-              child: Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-            ),
-            // const Spacer(),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Align(
-                alignment: Alignment.bottomRight,
-                child: IconButton(
-                  icon: Icon(
-                    favorite ? Icons.favorite : Icons.favorite_border,
-                    color: favorite ? Theme.of(context).colorScheme.primary : null,
-                  ),
-                  onPressed: onFavoriteToggle,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: IconButton(
+                        icon: Icon(
+                          favorite ? Icons.favorite : Icons.favorite_border,
+                          color: favorite ? Theme.of(context).colorScheme.primary : null,
+                        ),
+                        onPressed: onFavoriteToggle,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashRadius: 24,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
