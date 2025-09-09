@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../domain/repositories/recipe_repository.dart';
+import '../../../data/repositories/storage_repository.dart';
 import 'home_viewmodel.dart';
 import '../../profile/viewmodel/favorite_recipes_viewmodel.dart'; // Assuming this provides recipeRepositoryProvider
 
@@ -29,10 +32,11 @@ class RecipeDetailState {
 
 class RecipeDetailViewModel extends StateNotifier<RecipeDetailState> {
   final RecipeRepository repo;
+  final StorageRepository storageRepo;
   final int id;
   final Ref ref;
 
-  RecipeDetailViewModel(this.repo, this.id, this.ref)
+  RecipeDetailViewModel(this.repo, this.storageRepo, this.id, this.ref)
       : super(const RecipeDetailState());
 
   void updateFavoriteState(bool isFavorite) {
@@ -81,7 +85,7 @@ class RecipeDetailViewModel extends StateNotifier<RecipeDetailState> {
     }
   }
 
-  Future<void> saveRecipe(Recipe updatedRecipe) async {
+  Future<void> saveRecipe(Recipe updatedRecipe, XFile? newImageFile) async {
     if (state.recipe == null) {
       state = state.copyWith(error: "Receita original não encontrada para salvar.");
       return;
@@ -89,9 +93,21 @@ class RecipeDetailViewModel extends StateNotifier<RecipeDetailState> {
 
     state = state.copyWith(loading: true, error: '');
     try {
-      await repo.update(updatedRecipe);
+      String? finalImagePath = updatedRecipe.imagePath;
 
-      state = state.copyWith(loading: false, recipe: updatedRecipe);
+      if (newImageFile != null) {
+        final imageUrl = await storageRepo.uploadRecipeImage(
+          file: File(newImageFile.path),
+          userId: updatedRecipe.owner!,
+        );
+        finalImagePath = imageUrl;
+      }
+
+      final recipeToSave = updatedRecipe.copyWith(imagePath: finalImagePath);
+
+      await repo.update(recipeToSave);
+
+      state = state.copyWith(loading: false, recipe: recipeToSave);
 
       ref.invalidate(homeVmProvider);
     } catch (e) {
@@ -119,7 +135,8 @@ final recipeDetailVmProvider =
 StateNotifierProvider.family<RecipeDetailViewModel, RecipeDetailState, int>(
         (ref, id) {
       final repo = ref.watch(recipeRepositoryProvider);
-      final vm = RecipeDetailViewModel(repo, id, ref)
+      final storageRepo = ref.watch(storageRepositoryProvider);
+      final vm = RecipeDetailViewModel(repo, storageRepo, id, ref)
         ..load();
 
       ref.listen(favoriteRecipeIdsProvider, (previous, next) {

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -73,12 +74,23 @@ class RecipePage extends ConsumerStatefulWidget {
 }
 
 class _RecipePageState extends ConsumerState<RecipePage> {
+  XFile? _newImageFile;
   bool _isEditMode = false;
   late TextEditingController _titleController;
   late TextEditingController _timeController;
   late TextEditingController _servingsController;
   late TextEditingController _ingredientsController;
   late TextEditingController _stepsController;
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _newImageFile = image;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -117,58 +129,64 @@ class _RecipePageState extends ConsumerState<RecipePage> {
   void _toggleEditMode() {
     final recipeNotifier = ref.read(recipeDetailVmProvider(widget.id).notifier);
 
-    setState(() {
-      _isEditMode = !_isEditMode;
-
-      if (!_isEditMode) {
-        final currentRecipe = ref.read(recipeDetailVmProvider(widget.id)).recipe;
-        if (currentRecipe == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Erro: Não foi possível encontrar a receita para salvar.'))
-          );
-          return;
-        }
-
-        Map<String, List<String>> parsedIngredients = {};
-        final lines = _ingredientsController.text.split('\n');
-        String currentCategory = '';
-        for (var line in lines) {
-          if (line.trim().endsWith(':')) {
-            currentCategory = line.trim().substring(0, line.trim().length - 1);
-            parsedIngredients[currentCategory] = [];
-          } else if (currentCategory.isNotEmpty && line.trim().isNotEmpty) {
-            parsedIngredients[currentCategory]?.add(line.trim());
-          }
-        }
-
-        List<String> parsedSteps = _stepsController.text.split('\n').where((s) => s.trim().isNotEmpty).toList();
-
-        final updatedRecipe = currentRecipe.copyWith(
-          name: _titleController.text,
-          timeMinutes: int.tryParse(_timeController.text) ?? currentRecipe.timeMinutes,
-          servings: int.tryParse(_servingsController.text) ?? currentRecipe.servings,
-          ingredients: parsedIngredients,
-          steps: parsedSteps,
+    if (_isEditMode) {
+      final currentRecipe = ref.read(recipeDetailVmProvider(widget.id)).recipe;
+      if (currentRecipe == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro: Não foi possível encontrar a receita para salvar.'))
         );
-
-        recipeNotifier.saveRecipe(updatedRecipe);
-
-      } else {
-        final currentState = ref.read(recipeDetailVmProvider(widget.id));
-        _titleController.text = currentState.recipe?.name ?? widget.title;
-        _timeController.text = (currentState.recipe?.timeMinutes ?? widget.time.replaceAll(RegExp(r'[^0-9]'), '')).toString();
-        _servingsController.text = (currentState.recipe?.servings ?? widget.servings.replaceAll(RegExp(r'[^0-9]'), '')).toString();
-
-        String ingredientsText = '';
-        (currentState.recipe?.ingredients ?? widget.ingredients).forEach((category, items) {
-          ingredientsText += '$category:\n';
-          items.forEach((item) => ingredientsText += '  $item\n');
-          ingredientsText += '\n';
-        });
-        _ingredientsController.text = ingredientsText.trim();
-        _stepsController.text = (currentState.recipe?.steps ?? widget.preparationSteps).join('\n');
+        return;
       }
-    });
+
+      Map<String, List<String>> parsedIngredients = {};
+      final lines = _ingredientsController.text.split('\n');
+      String currentCategory = '';
+      for (var line in lines) {
+        if (line.trim().endsWith(':')) {
+          currentCategory = line.trim().substring(0, line.trim().length - 1);
+          parsedIngredients[currentCategory] = [];
+        } else if (currentCategory.isNotEmpty && line.trim().isNotEmpty) {
+          parsedIngredients[currentCategory]?.add(line.trim());
+        }
+      }
+      List<String> parsedSteps = _stepsController.text.split('\n').where((s) => s.trim().isNotEmpty).toList();
+
+      final updatedRecipe = currentRecipe.copyWith(
+        name: _titleController.text,
+        timeMinutes: int.tryParse(_timeController.text) ?? currentRecipe.timeMinutes,
+        servings: int.tryParse(_servingsController.text) ?? currentRecipe.servings,
+        ingredients: parsedIngredients,
+        steps: parsedSteps,
+      );
+
+      recipeNotifier.saveRecipe(updatedRecipe, _newImageFile);
+
+      setState(() {
+        _isEditMode = false;
+        _newImageFile = null;
+      });
+
+    } else {
+      final currentState = ref.read(recipeDetailVmProvider(widget.id));
+      _titleController.text = currentState.recipe?.name ?? widget.title;
+      _timeController.text = (currentState.recipe?.timeMinutes ?? '').toString();
+      _servingsController.text = (currentState.recipe?.servings ?? '').toString();
+
+      String ingredientsText = '';
+      (currentState.recipe?.ingredients ?? widget.ingredients).forEach((category, items) {
+        ingredientsText += '$category:\n';
+        for (var item in items) {
+          ingredientsText += '  $item\n';
+        }
+        ingredientsText += '\n';
+      });
+      _ingredientsController.text = ingredientsText.trim();
+      _stepsController.text = (currentState.recipe?.steps ?? widget.preparationSteps).join('\n');
+
+      setState(() {
+        _isEditMode = true;
+      });
+    }
   }
   
   Future<void> _confirmDeleteRecipe() async {
@@ -294,6 +312,104 @@ class _RecipePageState extends ConsumerState<RecipePage> {
     return Container(); // Placeholder for steps TextField in edit mode
   }
 
+  Widget _buildImageSection(RecipeDetailState currentRecipeState) {
+    final currentImage = currentRecipeState.recipe?.imagePath;
+
+    if (_isEditMode) {
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12.0),
+            child: _newImageFile != null
+                ? Image.file(
+              File(_newImageFile!.path),
+              height: 250,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            )
+                : (currentImage != null && currentImage.isNotEmpty
+                ? Image.network(
+              currentImage,
+              height: 250,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            )
+                : Container(
+              height: 250,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.photo_camera, color: Colors.grey[600], size: 50),
+            )),
+          ),
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: FloatingActionButton(
+              onPressed: _pickImage,
+              mini: true,
+              child: const Icon(Icons.edit),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (currentImage != null && currentImage.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12.0),
+        child: Image.network(
+          currentImage,
+          height: 250,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              height: 250,
+              width: double.infinity,
+              color: Colors.grey[300],
+              child: Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                      : null,
+                ),
+              ),
+            );
+          },
+          errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
+            if (kDebugMode) {
+              print('Error loading network image: $widget.imagePath, Exception: $exception');
+            }
+            return Container(
+              height: 250,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(12), // Match your style
+              ),
+              child: Icon(Icons.broken_image, color: Colors.grey[600], size: 50),
+            );
+          },
+        ),
+      );
+    }
+
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(Icons.photo_camera, color: Colors.grey[600], size: 50),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -332,55 +448,7 @@ class _RecipePageState extends ConsumerState<RecipePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            if (widget.imagePath != null && widget.imagePath!.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12.0),
-                child: Image.network(
-                        widget.imagePath!,
-                        height: 250,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            height: 250,
-                            width: double.infinity,
-                            color: Colors.grey[300],
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
-                          if (kDebugMode) {
-                            print('Error loading network image: $widget.imagePath, Exception: $exception');
-                          }
-                          return Container(
-                            height: 250,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(12), // Match your style
-                            ),
-                            child: Icon(Icons.broken_image, color: Colors.grey[600], size: 50),
-                          );
-                        },
-                      ),
-              ),
-            if (widget.imagePath == null || widget.imagePath!.isEmpty)
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.photo_camera, color: Colors.grey[600], size: 50),
-              ),
+            _buildImageSection(currentRecipeState),
             const SizedBox(height: 16),
             if (!_isEditMode) // Display title as Text when not editing
               Text(
