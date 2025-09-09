@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../auth/viewmodel/profile_providers.dart';
 import '../../../domain/entities/recipe.dart';
 import '../viewmodel/create_recipe_viewmodel.dart';
+import '../viewmodel/home_viewmodel.dart';
 
 class CreateRecipePage extends ConsumerStatefulWidget {
   const CreateRecipePage({super.key});
@@ -19,10 +20,24 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
   final _description = TextEditingController();
   final _ingredients = TextEditingController();
   final _steps = TextEditingController();
-  final _category = TextEditingController();
   final _timeMinutes = TextEditingController();
   final _servings = TextEditingController();
   XFile? _imageFile;
+
+
+  String? _selectedCategory;
+
+  @override
+  void dispose() {
+    // É uma boa prática limpar os controllers para liberar memória
+    _name.dispose();
+    _description.dispose();
+    _ingredients.dispose();
+    _steps.dispose();
+    _timeMinutes.dispose();
+    _servings.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -38,6 +53,9 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
     final theme = Theme.of(context);
     final userProfile = ref.watch(userProfileProvider);
 
+    // Obtém a lista de categorias diretamente do provider
+    final categories = ref.watch(categoriesProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Nova Receita')),
       body: SingleChildScrollView(
@@ -50,49 +68,72 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
               TextFormField(
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Nome da Receita'),
-                validator: (value) => (value?.isEmpty ?? true) ? 'Obrigatório' : null,
+                validator: (value) =>
+                (value?.isEmpty ?? true) ? 'Obrigatório' : null,
               ),
               const SizedBox(height: 16.0),
               TextFormField(
                 controller: _description,
                 decoration: const InputDecoration(labelText: 'Descrição'),
                 maxLines: 2,
-                validator: (value) => (value?.isEmpty ?? true) ? 'Obrigatório' : null,
+                validator: (value) =>
+                (value?.isEmpty ?? true) ? 'Obrigatório' : null,
               ),
               const SizedBox(height: 16.0),
               TextFormField(
                 controller: _ingredients,
                 decoration: const InputDecoration(
                   labelText: 'Ingredientes',
-                  hintText: 'Ex.:\nLegumes:\n  1 cenoura\n  1 abobrinha\nCarnes:\n  200g de patinho moído\nTempero Geral:',
+                  hintText:
+                  'Ex.:\nLegumes:\n  1 cenoura\n  1 abobrinha\nCarnes:\n  200g de patinho moído\nTempero Geral:',
                   alignLabelWithHint: true,
                 ),
                 maxLines: 7,
-                validator: (value) => (value?.isEmpty ?? true) ? 'Obrigatório' : null,
+                validator: (value) =>
+                (value?.isEmpty ?? true) ? 'Obrigatório' : null,
               ),
               const SizedBox(height: 16.0),
               TextFormField(
                 controller: _steps,
                 decoration: const InputDecoration(
-                    labelText: 'Modo de Preparo', hintText: 'Passo 1\nPasso 2\n...'),
+                    labelText: 'Modo de Preparo',
+                    hintText: 'Passo 1\nPasso 2\n...'),
                 maxLines: 7,
-                validator: (value) => (value?.isEmpty ?? true) ? 'Obrigatório' : null,
+                validator: (value) =>
+                (value?.isEmpty ?? true) ? 'Obrigatório' : null,
               ),
               const SizedBox(height: 16.0),
-              TextFormField(
-                controller: _category,
+
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
                 decoration: const InputDecoration(labelText: 'Categoria'),
-                validator: (value) => (value?.isEmpty ?? true) ? 'Obrigatório' : null,
+                hint: const Text('Selecione uma categoria'),
+                items: categories
+                    .map((category) => DropdownMenuItem(
+                  value: category,
+                  child: Text(category),
+                ))
+                    .toList(),
+                onChanged: (newValue) {
+                  setState(() {
+                    _selectedCategory = newValue;
+                  });
+                },
+                validator: (value) =>
+                value == null ? 'Selecione uma categoria' : null,
               ),
+
               const SizedBox(height: 16.0),
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
                       controller: _timeMinutes,
-                      decoration: const InputDecoration(labelText: 'Tempo (min)'),
+                      decoration:
+                      const InputDecoration(labelText: 'Tempo (min)'),
                       keyboardType: TextInputType.number,
-                      validator: (value) => (value?.isEmpty ?? true) ? 'Obrigatório' : null,
+                      validator: (value) =>
+                      (value?.isEmpty ?? true) ? 'Obrigatório' : null,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -101,7 +142,8 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
                       controller: _servings,
                       decoration: const InputDecoration(labelText: 'Porções'),
                       keyboardType: TextInputType.number,
-                      validator: (value) => (value?.isEmpty ?? true) ? 'Obrigatório' : null,
+                      validator: (value) =>
+                      (value?.isEmpty ?? true) ? 'Obrigatório' : null,
                     ),
                   ),
                 ],
@@ -109,30 +151,30 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
               const SizedBox(height: 20),
               _imageFile == null
                   ? OutlinedButton.icon(
-                      icon: const Icon(Icons.image),
-                      label: const Text('Selecionar Imagem'),
-                      onPressed: _pickImage,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    )
+                icon: const Icon(Icons.image),
+                label: const Text('Selecionar Imagem'),
+                onPressed: _pickImage,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              )
                   : Column(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.file(
-                            File(_imageFile!.path),
-                            height: 150,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        TextButton(
-                          child: const Text('Trocar imagem'),
-                          onPressed: _pickImage,
-                        )
-                      ],
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      File(_imageFile!.path),
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
                     ),
+                  ),
+                  TextButton(
+                    child: const Text('Trocar imagem'),
+                    onPressed: _pickImage,
+                  )
+                ],
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -151,27 +193,42 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
                       if (trimmedLine.isEmpty) continue;
 
                       if (trimmedLine.endsWith(':')) {
-                        currentCategory = trimmedLine.substring(0, trimmedLine.length - 1).trim();
-                        if (currentCategory.isEmpty) currentCategory = "Outros"; // Avoid empty category names
-                        parsedIngredients.putIfAbsent(currentCategory, () => []);
-                      } else if (parsedIngredients.containsKey(currentCategory)) {
+                        currentCategory = trimmedLine
+                            .substring(0, trimmedLine.length - 1)
+                            .trim();
+                        if (currentCategory.isEmpty)
+                          currentCategory = "Outros"; // Avoid empty category names
+                        parsedIngredients.putIfAbsent(
+                            currentCategory, () => []);
+                      } else if (parsedIngredients
+                          .containsKey(currentCategory)) {
                         parsedIngredients[currentCategory]!.add(trimmedLine);
                       } else {
-                         // Add to default if no category was explicitly set yet or category does not exist
-                        parsedIngredients.putIfAbsent(currentCategory, () => []).add(trimmedLine);
+                        parsedIngredients
+                            .putIfAbsent(currentCategory, () => [])
+                            .add(trimmedLine);
                       }
                     }
-                    // Ensure no category has an empty list if it was declared but no items followed
-                    parsedIngredients.removeWhere((key, value) => value.isEmpty && key != "Ingredientes");
-                    if (!parsedIngredients.containsKey("Ingredientes") || parsedIngredients["Ingredientes"]!.isEmpty) {
-                       if (parsedIngredients.values.every((list) => list.isEmpty)) {
-                         // If all categories are empty (e.g. only category headers were given), put raw text under default.
-                          parsedIngredients["Ingredientes"] = _ingredients.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-                       }
+                    parsedIngredients.removeWhere(
+                            (key, value) => value.isEmpty && key != "Ingredientes");
+                    if (!parsedIngredients.containsKey("Ingredientes") ||
+                        parsedIngredients["Ingredientes"]!.isEmpty) {
+                      if (parsedIngredients.values
+                          .every((list) => list.isEmpty)) {
+                        parsedIngredients["Ingredientes"] = _ingredients.text
+                            .split('\n')
+                            .map((s) => s.trim())
+                            .where((s) => s.isNotEmpty)
+                            .toList();
+                      }
                     }
-                    if (parsedIngredients.isEmpty && _ingredients.text.trim().isNotEmpty) {
-                       // Fallback if parsing results in empty but there was text
-                       parsedIngredients["Ingredientes"] = _ingredients.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                    if (parsedIngredients.isEmpty &&
+                        _ingredients.text.trim().isNotEmpty) {
+                      parsedIngredients["Ingredientes"] = _ingredients.text
+                          .split('\n')
+                          .map((s) => s.trim())
+                          .where((s) => s.isNotEmpty)
+                          .toList();
                     }
 
                     final recipe = Recipe(
@@ -179,8 +236,12 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
                       description: _description.text,
                       owner: userProfile.value?['id'] as String,
                       ingredients: parsedIngredients,
-                      steps: _steps.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-                      category: _category.text,
+                      steps: _steps.text
+                          .split('\n')
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList(),
+                      category: _selectedCategory!,
                       timeMinutes: int.parse(_timeMinutes.text),
                       servings: int.parse(_servings.text),
                       imagePath: null,
@@ -188,7 +249,8 @@ class _CreateRecipePageState extends ConsumerState<CreateRecipePage> {
                     await viewModel.create(recipe, _imageFile);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Receita criada com sucesso!')),
+                        const SnackBar(
+                            content: Text('Receita criada com sucesso!')),
                       );
                       Navigator.pop(context);
                     }

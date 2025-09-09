@@ -28,8 +28,8 @@ class HomeState {
   final String? error;
   final String search;
   final Map<String, List<Recipe>> categorizedRecipes;
-  final List<String> categories; // Categorias visíveis APÓS a busca
-  final List<String> allAvailableCategories; // TODAS as categorias para os balões
+  final List<String> categories;
+  final List<String> allAvailableCategories;
 
   const HomeState({
     this.loading = false,
@@ -70,12 +70,9 @@ class HomeViewModel extends StateNotifier<HomeState> {
   Future<void> load() async {
     state = state.copyWith(loading: true, error: '');
     try {
-      // Busca todas as categorias disponíveis apenas uma vez, na primeira carga
-      if (state.allAvailableCategories.isEmpty) {
-        final allCats = await repo.getCategories();
-        allCats.sort();
-        state = state.copyWith(allAvailableCategories: allCats);
-      }
+      // Usa a lista de categorias do novo provider estático
+      final allCats = ref.read(categoriesProvider);
+      state = state.copyWith(allAvailableCategories: allCats);
 
       final recipes = await repo.getAll(
         search: state.search.isEmpty ? null : state.search,
@@ -152,4 +149,37 @@ final homeVmProvider = StateNotifierProvider<HomeViewModel, HomeState>((ref) {
   });
 
   return vm;
+});
+
+// O provider agora é síncrono и retorna uma lista fixa de categorias.
+final categoriesProvider = Provider<List<String>>((ref) {
+  return [
+    'Acompanhamentos',
+    'Aperitivos',
+    'Arroz e Risotos',
+    'Aves',
+    'Bebidas',
+    'Bolos e Tortas',
+    'Brasileira',
+    'Carnes',
+    'Churrasco',
+    'Fitness',
+    'Frutos do Mar',
+    'Italiana',
+    'Japonesa',
+    'Chinesa',
+    'Lanches',
+    'Massas',
+    'Mexicana',
+    'Molhos',
+    'Pães',
+    'Peixes',
+    'Rápida e Fácil',
+    'Saladas',
+    'Sopas',
+    'Sobremesas',
+    'Vegana',
+    'Vegetariana',
+    'Árabe',
+  ]..sort();
 });
