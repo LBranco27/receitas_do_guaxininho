@@ -128,19 +128,14 @@ class _HomePageState extends ConsumerState<HomePage> {
               decoration: InputDecoration(
                 hintText: 'Buscar por nome ou categoria...',
                 prefixIcon: const Icon(Icons.search),
-                // ## INÍCIO DA ALTERAÇÃO ##
-                // Adiciona o botão 'X' (sufixo) apenas se houver texto
                 suffixIcon: _showClearButton
                     ? IconButton(
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     _searchController.clear();
-                    // O onChanged já é acionado ao limpar,
-                    // então a busca será atualizada automaticamente.
                   },
                 )
                     : null,
-                // ## FIM DA ALTERAÇÃO ##
               ),
             ),
           ),
@@ -149,11 +144,11 @@ class _HomePageState extends ConsumerState<HomePage> {
             onCategorySelected: _performSearch,
           ),
           Expanded(
-            child: state.loading && state.categorizedRecipes.isEmpty
+            child: state.loading && state.categorizedRecipes.isEmpty && state.popularRecipes.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : state.error != null
                 ? Center(child: Text('Erro: ${state.error}'))
-                : state.categories.isEmpty
+                : state.categories.isEmpty && state.popularRecipes.isEmpty
                 ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -170,9 +165,21 @@ class _HomePageState extends ConsumerState<HomePage> {
               onRefresh: vm.refresh,
               child: ListView.builder(
                 padding: const EdgeInsets.only(bottom: 12),
-                itemCount: state.categories.length,
-                itemBuilder: (_, i) {
-                  final category = state.categories[i];
+                itemCount: state.categories.length + (state.popularRecipes.isNotEmpty ? 1 : 0),
+                itemBuilder: (_, index) {
+                  final hasPopulars = state.popularRecipes.isNotEmpty;
+
+                  // Se for o primeiro item e houver receitas populares, exibe o carrossel delas.
+                  if (hasPopulars && index == 0) {
+                    return _CategoryCarousel(
+                      category: 'Populares',
+                      recipes: state.popularRecipes,
+                    );
+                  }
+
+                  // Para os itens seguintes, ajusta o índice para pegar da lista de categorias.
+                  final categoryIndex = hasPopulars ? index - 1 : index;
+                  final category = state.categories[categoryIndex];
                   final recipes =
                   state.categorizedRecipes[category]!;
                   return _CategoryCarousel(

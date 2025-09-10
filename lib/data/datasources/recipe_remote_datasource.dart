@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart'; // Import for debugPrint
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/entities/recipe.dart';
 
@@ -9,18 +9,12 @@ class RecipeRemoteDataSource {
     try {
       var query = _supabaseClient.from('recipes').select();
 
-      // ## INÍCIO DA ALTERAÇÃO ##
-      // A lógica de busca agora considera tanto o nome quanto a categoria.
       if (search != null && search.trim().isNotEmpty) {
         final searchTerm = '%${search.trim().toLowerCase()}%';
         // Usamos o filtro 'or' do Supabase para buscar em ambas as colunas
-        // com uma condição "OU".
         query = query.or('name.ilike.$searchTerm,category.ilike.$searchTerm');
       }
-      // ## FIM DA ALTERAÇÃO ##
 
-      // Este filtro de categoria é mantido para usos futuros,
-      // mas a HomePage agora utiliza a busca unificada acima.
       if (category != null && category.isNotEmpty) {
         query = query.eq('category', category);
       }
@@ -163,7 +157,7 @@ class RecipeRemoteDataSource {
   Future<void> addFavorite(int recipeId) async {
     final userId = _supabaseClient.auth.currentUser?.id;
     if (userId == null) throw 'Usuário não autenticado';
-    await _supabaseClient.from('user_favorites').insert({
+    await _supabaseClient.from('user_favorites').upsert({
       'user_id': userId,
       'recipe_id': recipeId,
     });
@@ -240,4 +234,33 @@ class RecipeRemoteDataSource {
 
     return response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
   }
+
+  Future<List<Recipe>> getPopularRecipes({int limit = 10}) async {
+    try {
+      final response = await _supabaseClient
+          .rpc('get_popular_recipes', params: {'p_limit': limit});
+
+      // O Supabase retorna o resultado do JSON como uma lista
+      final recipeList = response as List;
+
+      if (kDebugMode) {
+        print('--- DEBUG: Contagem de Curtidas (Populares) ---');
+        for (var item in recipeList) {
+          final recipeName = item['name'];
+          final favoriteCount = item['favorite_count'];
+          print('Receita: "$recipeName" - Curtidas: $favoriteCount');
+        }
+        print('-------------------------------------------');
+      }
+
+      return recipeList.map<Recipe>((data) => Recipe.fromMap(data)).toList();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Erro ao buscar receitas populares: $e');
+      }
+      throw Exception('Falha ao buscar receitas populares');
+    }
+  }
+
+
 }

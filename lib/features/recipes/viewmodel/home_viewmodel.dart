@@ -30,6 +30,7 @@ class HomeState {
   final Map<String, List<Recipe>> categorizedRecipes;
   final List<String> categories;
   final List<String> allAvailableCategories;
+  final List<Recipe> popularRecipes;
 
   const HomeState({
     this.loading = false,
@@ -38,6 +39,7 @@ class HomeState {
     this.categorizedRecipes = const {},
     this.categories = const [],
     this.allAvailableCategories = const [],
+    this.popularRecipes = const [],
   });
 
   HomeState copyWith({
@@ -47,6 +49,7 @@ class HomeState {
     Map<String, List<Recipe>>? categorizedRecipes,
     List<String>? categories,
     List<String>? allAvailableCategories,
+    List<Recipe>? popularRecipes,
   }) {
     return HomeState(
       loading: loading ?? this.loading,
@@ -56,6 +59,7 @@ class HomeState {
       categories: categories ?? this.categories,
       allAvailableCategories:
       allAvailableCategories ?? this.allAvailableCategories,
+      popularRecipes: popularRecipes ?? this.popularRecipes,
     );
   }
 }
@@ -70,21 +74,29 @@ class HomeViewModel extends StateNotifier<HomeState> {
   Future<void> load() async {
     state = state.copyWith(loading: true, error: '');
     try {
-      // Usa a lista de categorias do novo provider estático
       final allCats = ref.read(categoriesProvider);
       state = state.copyWith(allAvailableCategories: allCats);
 
-      final recipes = await repo.getAll(
-        search: state.search.isEmpty ? null : state.search,
-      );
-      final favoriteIds = await ref.read(favoriteRecipeIdsProvider.future);
+      final results = await Future.wait([
+        repo.getPopularRecipes(),
+        repo.getAll(search: state.search.isEmpty ? null : state.search),
+        ref.read(favoriteRecipeIdsProvider.future),
+      ]);
 
-      final updatedRecipes = recipes.map((recipe) {
+      final popularRecipesRaw = results[0] as List<Recipe>;
+      final recipesRaw = results[1] as List<Recipe>;
+      final favoriteIds = results[2] as Set<int>;
+
+      final popularRecipes = popularRecipesRaw.map((recipe) {
+        return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
+      }).toList();
+
+      final recipes = recipesRaw.map((recipe) {
         return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
       }).toList();
 
       final newCategorizedRecipes = <String, List<Recipe>>{};
-      for (final recipe in updatedRecipes) {
+      for (final recipe in recipes) {
         (newCategorizedRecipes[recipe.category] ??= []).add(recipe);
       }
 
@@ -94,6 +106,7 @@ class HomeViewModel extends StateNotifier<HomeState> {
         loading: false,
         categorizedRecipes: newCategorizedRecipes,
         categories: newCategories,
+        popularRecipes: popularRecipes,
       );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());

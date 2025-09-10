@@ -49,4 +49,8 @@ class RecipeRepositoryImpl implements RecipeRepository {
     required int page,
     required int limit,
   }) => ds.getUserRecipes(userId: userId, page: page, limit: limit);
+
+  @override
+  Future<List<Recipe>> getPopularRecipes({int limit = 10}) => ds.getPopularRecipes(limit: limit);
+
 }
