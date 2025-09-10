@@ -18,6 +18,12 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
+  // --------- Configs do "ver mais" das categorias de favoritos ---------
+  static const int _initialCategories = 2;
+  static const int _previewItemsPerCategory = 2;
+
+  int _visibleCategories = _initialCategories;
+  final Map<String, bool> _expandedCategories = {};
   @override
   Widget build(BuildContext context) {
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
@@ -126,7 +132,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
-  // ---- Favoritas (categorias) ----
+  // ---- Favoritas (categorias) com "ver mais" global e por categoria ----
   Widget _buildCategorizedFavorites(BuildContext context, FavoriteRecipesState state) {
     if (state.isLoading && state.categories.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -143,37 +149,107 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: state.categories.length,
-      itemBuilder: (context, index) {
-        final category = state.categories[index];
-        final recipesInCategory = state.categorizedRecipes[category]!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
-              child: Text(
-                category,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.secondary,
+    // Limita quantas categorias aparecem de uma vez
+    final totalCats = state.categories.length;
+    final showingCats = state.categories.take(_visibleCategories).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Lista de categorias visíveis
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: showingCats.length,
+          itemBuilder: (context, index) {
+            final category = showingCats[index];
+            final allItems = state.categorizedRecipes[category] ?? const <Recipe>[];
+
+            final expanded = _expandedCategories[category] ?? false;
+            final visibleItems = expanded
+                ? allItems
+                : allItems.take(_previewItemsPerCategory).toList();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Cabeçalho da categoria com botão "ver mais/menos"
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          category,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                      ),
+                      if (allItems.length > _previewItemsPerCategory)
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _expandedCategories[category] = !expanded;
+                            });
+                          },
+                          icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
+                          label: Text(expanded ? 'Ver menos' : 'Ver mais'),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+
+                // Receitas visíveis da categoria
+                ...visibleItems.map((r) => _buildRecipeCard(context, r)).toList(),
+
+                const Divider(height: 32),
+              ],
+            );
+          },
+        ),
+
+        // "Ver mais categorias" global
+        if (_visibleCategories < totalCats)
+          Align(
+            alignment: Alignment.center,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _visibleCategories =
+                      (_visibleCategories + _initialCategories).clamp(0, totalCats);
+                });
+              },
+              icon: const Icon(Icons.category),
+              label: Text('Ver mais categorias (${totalCats - _visibleCategories})'),
             ),
-            ...recipesInCategory.map((recipe) => _buildRecipeCard(context, recipe)).toList(),
-            if (index < state.categories.length - 1) const Divider(height: 32),
-          ],
-        );
-      },
+          ),
+
+        // "Ver menos categorias" global
+        if (_visibleCategories > _initialCategories)
+          Align(
+            alignment: Alignment.center,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _visibleCategories = _initialCategories;
+                });
+              },
+              icon: const Icon(Icons.expand_less),
+              label: const Text('Ver menos categorias'),
+            ),
+          ),
+      ],
     );
   }
 
-  // ---- Minhas receitas ----
+  // ---- Minhas receitas (paginação por botões) ----
   Widget _buildPaginatedMyRecipes(
-      BuildContext context, MyRecipesState state, MyRecipesViewModel notifier) {
+      BuildContext context,
+      MyRecipesState state,
+      MyRecipesViewModel notifier,
+      ) {
     if (state.isLoading && state.recipes.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
