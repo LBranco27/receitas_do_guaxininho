@@ -139,9 +139,9 @@ class HomeViewModel extends StateNotifier<HomeState> {
     }
   }
 
-  void setSearch(String value) {
+  Future<void> setSearch(String value) async {
     state = state.copyWith(search: value);
-    load();
+    await load();
   }
 
   Future<void> refresh() => load();
