@@ -9,7 +9,7 @@ import 'package:receitas_do_guaxininho/domain/entities/recipe.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
-  final String? userId; // userID of the profile to display, null for current user
+  final String? userId;
 
   const ProfilePage({super.key, this.userId});
 
@@ -18,31 +18,19 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
-  final ScrollController _scrollController = ScrollController();
-
   @override
   Widget build(BuildContext context) {
-    final _supabaseClient = Supabase.instance.client;
-    final currentUserId = _supabaseClient.auth.currentUser?.id;
-    bool isCurrentUserProfile = widget.userId == null;
-    if (!isCurrentUserProfile) {
-      if (currentUserId == widget.userId) {
-        isCurrentUserProfile = true;
-      }
-    }
-    // Use anyUserProfileProvider if userId is provided, otherwise use userProfileProvider for the current user
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final isCurrentUserProfile = widget.userId == null || widget.userId == currentUserId;
+
     final userProfileAsyncValue = isCurrentUserProfile
         ? ref.watch(userProfileProvider)
         : ref.watch(anyUserProfileProvider(widget.userId!));
 
     final profileViewModel = ref.watch(profileViewModelProvider);
-    // Conditional logic for favorites and my recipes view models might be needed
-    // For now, these are tied to the current user.
     final favoritesState = ref.watch(favoriteRecipesViewModelProvider);
-    final favoritesNotifier = ref.read(favoriteRecipesViewModelProvider.notifier);
     final myRecipesState = ref.watch(myRecipesViewModelProvider(widget.userId));
     final myRecipesNotifier = ref.read(myRecipesViewModelProvider(widget.userId).notifier);
-
 
     ref.listen<AsyncValue<bool>>(profileViewModelProvider, (_, state) {
       if (state.hasError && !state.isLoading) {
@@ -61,7 +49,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isCurrentUserProfile ? 'Meu Perfil' : 'Perfil'), // Title will be updated with name below
+        title: Text(isCurrentUserProfile ? 'Meu Perfil' : 'Perfil'),
       ),
       body: userProfileAsyncValue.when(
         data: (profileData) {
@@ -72,17 +60,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           final avatarUrl = profileData?['avatar_url'] as String?;
 
           return ListView(
-            controller: _scrollController,
             padding: const EdgeInsets.all(24.0),
             children: [
+              // --- Cabeçalho ---
               CircleAvatar(
                 radius: 80,
                 backgroundColor: Colors.grey.shade300,
-                backgroundImage:
-                avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
                 child: avatarUrl == null
-                    ? Icon(Icons.person,
-                    size: 80, color: Colors.grey.shade600)
+                    ? Icon(Icons.person, size: 80, color: Colors.grey.shade600)
                     : null,
               ),
               const SizedBox(height: 24),
@@ -92,6 +78,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 20),
+
+              // --- Área do próprio usuário ---
               if (isCurrentUserProfile) ...[
                 profileViewModel.isLoading
                     ? const Center(child: CircularProgressIndicator())
@@ -102,43 +90,32 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   onPressed: () {
-                    ref
-                        .read(profileViewModelProvider.notifier)
-                        .uploadAvatar();
+                    ref.read(profileViewModelProvider.notifier).uploadAvatar();
                   },
                 ),
                 const SizedBox(height: 40),
                 const Divider(),
                 const SizedBox(height: 16),
-
-                Text(
-                  'Receitas Favoritas',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                Text('Receitas Favoritas', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 16),
-                _buildPaginatedFavorites(context, favoritesState, favoritesNotifier),
-
-                const SizedBox(height: 40),
-                const Divider(),
-                const SizedBox(height: 16),
-
-                Text(
-                  'Minhas Receitas',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                _buildPaginatedMyRecipes(context, myRecipesState, myRecipesNotifier),
-              ] else ...[
-                const SizedBox(height: 40),
-                const Divider(),
-                const SizedBox(height: 16),
-                Text(
-                  'Receitas de ${name ?? "Usuário"}',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                _buildPaginatedMyRecipes(context, myRecipesState, myRecipesNotifier),
+                _buildCategorizedFavorites(context, favoritesState),
               ],
+
+              // --- Minhas receitas com paginação ---
+              const SizedBox(height: 40),
+              const Divider(),
+              const SizedBox(height: 16),
+              Text(
+                isCurrentUserProfile ? 'Minhas Receitas' : 'Receitas de ${name ?? "Usuário"}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Mostrando 5 receitas por página.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 16),
+              _buildPaginatedMyRecipes(context, myRecipesState, myRecipesNotifier),
               const SizedBox(height: 24),
             ],
           );
@@ -149,82 +126,78 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
-  Widget _buildPaginatedFavorites(BuildContext context, FavoriteRecipesState state, FavoriteRecipesViewModel notifier) {
-    if (state.isLoading && state.recipes.isEmpty) {
+  // ---- Favoritas (categorias) ----
+  Widget _buildCategorizedFavorites(BuildContext context, FavoriteRecipesState state) {
+    if (state.isLoading && state.categories.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    if (state.error != null && state.recipes.isEmpty) {
+    if (state.error != null && state.categories.isEmpty) {
       return Center(child: Text('Erro: ${state.error}'));
     }
-
-    if (state.recipes.isEmpty) {
+    if (state.categories.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(16.0),
-          child: Text(
-            'Você ainda não favoritou nenhuma receita. 😕',
-            textAlign: TextAlign.center,
-          ),
+          child: Text('Você ainda não favoritou nenhuma receita. 😕', textAlign: TextAlign.center),
         ),
       );
     }
 
-    return Column(
-      children: [
-        if (state.isLoading)
-          const Center(child: Padding(
-            padding: EdgeInsets.all(32.0),
-            child: CircularProgressIndicator(),
-          ))
-        else
-          ...state.recipes.map((recipe) => _buildRecipeCard(context, recipe)),
-
-        const SizedBox(height: 16),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: state.categories.length,
+      itemBuilder: (context, index) {
+        final category = state.categories[index];
+        final recipesInCategory = state.categorizedRecipes[category]!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextButton.icon(
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Anterior'),
-              onPressed: state.page == 0 ? null : () {
-                notifier.loadPage(state.page - 1);
-              },
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+              child: Text(
+                category,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
             ),
-
-            Text('Página ${state.page + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-
-            TextButton.icon(
-              icon: const Icon(Icons.arrow_forward),
-              label: const Text('Próxima'),
-              onPressed: !state.hasMore ? null : () {
-                notifier.loadPage(state.page + 1);
-              },
-            ),
+            ...recipesInCategory.map((recipe) => _buildRecipeCard(context, recipe)).toList(),
+            if (index < state.categories.length - 1) const Divider(height: 32),
           ],
-        )
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildPaginatedMyRecipes(BuildContext context, MyRecipesState state, MyRecipesViewModel notifier) {
+  // ---- Minhas receitas ----
+  Widget _buildPaginatedMyRecipes(
+      BuildContext context, MyRecipesState state, MyRecipesViewModel notifier) {
     if (state.isLoading && state.recipes.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-
     if (state.error != null && state.recipes.isEmpty) {
-      return Center(child: Text('Erro: ${state.error}'));
+      return Column(
+        children: [
+          Text('Erro: ${state.error}', textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.refresh),
+            label: const Text('Tentar novamente'),
+            onPressed: () => notifier.loadPage(state.page),
+          ),
+        ],
+      );
     }
-
     if (state.recipes.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Text(
             widget.userId == null
-              ? 'Você ainda não criou nenhuma receita. ✍️'
-              : 'Este usuário ainda não criou nenhuma receita. 😕',
+                ? 'Você ainda não criou nenhuma receita. ✍️'
+                : 'Este usuário ainda não criou nenhuma receita. 😕',
             textAlign: TextAlign.center,
           ),
         ),
@@ -233,63 +206,123 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     return Column(
       children: [
-        if (state.isLoading)
-          const Center(child: Padding(
-            padding: EdgeInsets.all(32.0),
-            child: CircularProgressIndicator(),
-          ))
-        else
-          ...state.recipes.map((recipe) => _buildRecipeCard(context, recipe)),
+        // lista da página corrente (5 itens)
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: state.recipes.length,
+          itemBuilder: (context, index) {
+            final recipe = state.recipes[index];
+            return _buildRecipeCard(context, recipe);
+          },
+        ),
+        const SizedBox(height: 12),
 
-        const SizedBox(height: 16),
-
+        // controles de paginação
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            TextButton.icon(
-              icon: const Icon(Icons.arrow_back),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.chevron_left),
               label: const Text('Anterior'),
-              onPressed: state.page == 0 ? null : () {
-                notifier.loadPage(state.page - 1);
-              },
+              onPressed: (!state.isLoading && state.page > 0)
+                  ? () => notifier.prevPage()
+                  : null,
             ),
-
-            Text('Página ${state.page + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-
-            TextButton.icon(
-              icon: const Icon(Icons.arrow_forward),
+            Text(
+              'Página ${state.page + 1}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.chevron_right),
               label: const Text('Próxima'),
-              onPressed: !state.hasMore ? null : () {
-                notifier.loadPage(state.page + 1);
-              },
+              onPressed: (!state.isLoading && state.hasMore)
+                  ? () => notifier.nextPage()
+                  : null,
             ),
           ],
-        )
+        ),
+
+        if (state.isLoading) ...[
+          const SizedBox(height: 12),
+          const Center(child: CircularProgressIndicator()),
+        ],
       ],
     );
   }
 
+  // ---- Card de receita ----
   Widget _buildRecipeCard(BuildContext context, Recipe recipe) {
+    final img = (recipe.imagePath?.trim().isEmpty ?? true) ? null : recipe.imagePath;
+
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ListTile(
-        leading: recipe.imagePath != null
-            ? ClipRRect(
-          borderRadius: BorderRadius.circular(8.0),
-          child: Image.network(
-            recipe.imagePath!,
-            width: 56,
-            height: 56,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stack) => const Icon(Icons.restaurant),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      elevation: 2,
+      child: InkWell(
+        onTap: () => context.push('/recipe/${recipe.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8.0),
+                child: img != null
+                    ? Image.network(
+                  img,
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, progress) => progress == null
+                      ? child
+                      : Container(
+                    width: 70,
+                    height: 70,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2.0),
+                    ),
+                  ),
+                  errorBuilder: (context, error, stack) => Container(
+                    width: 70,
+                    height: 70,
+                    color: Colors.grey[200],
+                    child: const Icon(Icons.restaurant_menu_outlined, color: Colors.grey),
+                  ),
+                )
+                    : Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: const Icon(Icons.restaurant_menu_outlined, color: Colors.grey),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      recipe.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${recipe.timeMinutes} min • ${recipe.category}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        )
-            : const Icon(Icons.restaurant, size: 40),
-        title: Text(recipe.name),
-        subtitle: Text('${recipe.timeMinutes} min • ${recipe.category}'),
-        onTap: () {
-          context.push('/recipe/${recipe.id}');
-        },
+        ),
       ),
     );
   }

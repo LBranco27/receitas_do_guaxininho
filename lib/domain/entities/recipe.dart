@@ -1,7 +1,5 @@
 import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:postgrest/src/types.dart';
 
 class Recipe {
   final int? id;
@@ -14,7 +12,9 @@ class Recipe {
   final int timeMinutes;
   final int servings;
   final bool isFavorite;
-  final String? imagePath; // Tornando imagePath opcional
+
+  /// Pode ser null ou URL/path. String vazia é normalizada para null.
+  final String? imagePath;
 
   Recipe({
     this.id,
@@ -42,7 +42,7 @@ class Recipe {
     int? servings,
     bool? isFavorite,
     String? imagePath,
-    bool? clearImagePath, // Para explicitamente setar imagePath como null
+    bool? clearImagePath, // se true, força imagePath = null
   }) {
     return Recipe(
       id: id ?? this.id,
@@ -55,7 +55,7 @@ class Recipe {
       timeMinutes: timeMinutes ?? this.timeMinutes,
       servings: servings ?? this.servings,
       isFavorite: isFavorite ?? this.isFavorite,
-      imagePath: clearImagePath == true ? null : imagePath ?? this.imagePath,
+      imagePath: clearImagePath == true ? null : (imagePath ?? this.imagePath),
     );
   }
 
@@ -64,8 +64,8 @@ class Recipe {
       'name': name,
       'description': description,
       'owner': owner,
-      'ingredients': jsonEncode(ingredients), // Store as JSON string
-      'steps': jsonEncode(steps), // Store as JSON string
+      'ingredients': ingredients,
+      'steps': steps,
       'category': category,
       'timeMinutes': timeMinutes,
       'servings': servings,
@@ -73,87 +73,149 @@ class Recipe {
     };
   }
 
-  factory Recipe.fromMap(Map<String, dynamic> map) {
-    Map<String, List<String>> parsedIngredients = {};
-    try {
-      print(map);
-      final ingredientsData = jsonDecode(map['ingredients'] as String);
+  // --------------------- Parsers resilientes ---------------------
 
-      if (ingredientsData is Map) {
-        // New format: Map<String, List<String>> or Old format: Map<String, String>
-        ingredientsData.forEach((key, value) {
-          if (value is List) {
-            // Correct new format
-            parsedIngredients[key.toString()] =
-                List<String>.from(value.map((e) => e.toString()));
-          } else if (value is String) {
-            // Old Map<String, String> format, convert to Map<String, List<String>>
-            parsedIngredients[key.toString()] = [value];
-          } else {
-             // Unexpected value type
-            if (kDebugMode) {
-              print('[Recipe.fromMap Warning] Unexpected type for ingredient value under key "$key": ${value.runtimeType}');
-            }
-            parsedIngredients[key.toString()] = [value.toString()]; // Best effort
+  static Map<String, List<String>> _parseIngredients(dynamic raw) {
+    dynamic v = raw;
+
+    // Se vier como String JSON, tenta decodificar
+    if (v is String && v.trim().isNotEmpty) {
+      try {
+        v = jsonDecode(v);
+      } catch (_) {
+        // se não decodificar, segue com a string crua
+      }
+    }
+
+    // Caso 1: já é um mapa {secao: [itens]}
+    if (v is Map) {
+      final out = <String, List<String>>{};
+      v.forEach((key, val) {
+        final k = key?.toString() ?? 'Ingredientes';
+        if (val is List) {
+          out[k] = val.map((e) => e.toString()).toList();
+        } else if (val is String) {
+          out[k] = [val];
+        } else if (val == null) {
+          out[k] = const <String>[];
+        } else {
+          if (kDebugMode) {
+            print(
+              '[Recipe.fromMap] Valor inesperado em ingredients["$k"]: ${val.runtimeType}',
+            );
           }
-        });
-      } else if (ingredientsData is List) {
-        // Oldest List<String> format, group under a default category
-        parsedIngredients['Ingredientes'] =
-            List<String>.from(ingredientsData.map((e) => e.toString()));
-      } else {
-        if (kDebugMode) {
-          print('[Recipe.fromMap Error] Unrecognized format for ingredients for recipe ID ${map['id']}: ${ingredientsData.runtimeType}');
+          out[k] = [val.toString()];
         }
-         // Fallback to empty or a special error key if necessary
-        parsedIngredients['Erro ao Carregar Ingredientes'] = [(map['ingredients'] as String? ?? 'Dados inválidos')];
-      }
-    } catch (e, s) {
-      if (kDebugMode) {
-        print('[Recipe.fromMap Error] Failed to parse ingredients for recipe ID ${map['id']}: $e');
-        print('[Recipe.fromMap StackTrace] $s');
-      }
-      // Fallback to empty or include raw data under an error key
-      parsedIngredients['Erro ao Decodificar Ingredientes'] = [(map['ingredients'] as String? ?? 'Dados brutos indisponíveis')];
+      });
+      return out;
     }
 
-    List<String> parsedSteps = [];
-    try {
-      final stepsData = jsonDecode(map['steps'] as String);
-      if (stepsData is List) {
-        parsedSteps = List<String>.from(stepsData.map((e) => e.toString()));
-      } else {
-         if (kDebugMode) {
-           print('[Recipe.fromMap Warning] Steps data is not a list for recipe ID ${map['id']}. Found: ${stepsData.runtimeType}');
-         }
-         parsedSteps = [(map['steps'] as String? ?? '')]; // Best effort
-      }
-    } catch (e) {
-       if (kDebugMode) {
-         print('[Recipe.fromMap Error] Failed to parse steps for recipe ID ${map['id']}: $e');
-       }
-       parsedSteps = [(map['steps'] as String? ?? 'Erro ao decodificar passos')];
+    // Caso 2: é um array simples -> coloca tudo numa seção padrão
+    if (v is List) {
+      return {'Ingredientes': v.map((e) => e.toString()).toList()};
     }
 
+    // Caso 3: qualquer outra coisa -> retorna vazio (ou coloca sob uma chave de erro)
+    if (v != null && (v is String && v.trim().isNotEmpty)) {
+      return {
+        'Ingredientes': [v.toString()],
+      };
+    }
+
+    return <String, List<String>>{};
+  }
+
+  static List<String> _parseSteps(dynamic raw) {
+    dynamic v = raw;
+
+    if (v is String && v.trim().isNotEmpty) {
+      // pode ser um JSON string ou um texto simples
+      try {
+        final decoded = jsonDecode(v);
+        v = decoded;
+      } catch (_) {
+        // não é JSON, trata como texto único
+        return [v];
+      }
+    }
+
+    if (v is List) return v.map((e) => e.toString()).toList();
+    if (v is String && v.isNotEmpty) return [v];
+
+    return const <String>[];
+  }
+
+  static String? _normalizeImagePath(dynamic raw) {
+    if (raw == null) return null;
+    final s = raw.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  static int _parseInt(dynamic raw, {int defaultValue = 0}) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) {
+      final n = int.tryParse(raw);
+      if (n != null) return n;
+    }
+    return defaultValue;
+  }
+
+  static bool _parseIsFavorite(dynamic raw) {
+    if (raw is bool) return raw;
+    if (raw is int) return raw == 1;
+    if (raw is String) {
+      final s = raw.toLowerCase().trim();
+      return s == '1' || s == 'true' || s == 't' || s == 'yes' || s == 'y';
+    }
+    return false;
+  }
+
+  // --------------------- Factory principal ---------------------
+
+  factory Recipe.fromMap(Map<String, dynamic> map) {
+    if (kDebugMode) {
+      // print(map);
+    }
+
+    final ingredients = _parseIngredients(map['ingredients']);
+    final steps = _parseSteps(map['steps']);
+
+    // Aceita variações de nomes: timeMinutes vs time_minutes; imagePath vs image_path
+    final timeMinutes = _parseInt(
+      map['timeMinutes'] ?? map['time_minutes'] ?? 0,
+    );
+    final servings = _parseInt(map['servings'] ?? 0);
 
     return Recipe(
-      id: map['id'] as int?,
-      name: map['name'] as String,
-      description: map['description'] as String,
-      owner: map['owner'] as String,
-      ingredients: parsedIngredients,
-      steps: parsedSteps,
-      category: map['category'] as String,
-      timeMinutes: map['timeMinutes'] as int,
-      servings: map['servings'] as int,
-      isFavorite: (map['isFavorite'] as int?) == 1,
-      imagePath: map['imagePath'] as String?,
+      id: map['id'] is int ? map['id'] as int : _parseInt(map['id']),
+      name: map['name']?.toString() ?? '',
+      description: map['description']?.toString() ?? '',
+      owner: map['owner']?.toString(),
+      ingredients: ingredients,
+      steps: steps,
+      category: map['category']?.toString() ?? '',
+      timeMinutes: timeMinutes,
+      servings: servings,
+      isFavorite: _parseIsFavorite(map['isFavorite'] ?? map['is_favorite']),
+      imagePath: _normalizeImagePath(map['imagePath'] ?? map['image_path']),
     );
   }
 
   @override
   String toString() {
-    return 'Recipe(id: $id, name: $name, description: $description, ingredients: $ingredients, steps: $steps, category: $category, timeMinutes: $timeMinutes, servings: $servings, isFavorite: $isFavorite, imagePath: $imagePath)';
+    return 'Recipe('
+        'id: $id, '
+        'name: $name, '
+        'description: $description, '
+        'owner: $owner, '
+        'ingredients: $ingredients, '
+        'steps: $steps, '
+        'category: $category, '
+        'timeMinutes: $timeMinutes, '
+        'servings: $servings, '
+        'isFavorite: $isFavorite, '
+        'imagePath: $imagePath'
+        ')';
   }
-
 }

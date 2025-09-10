@@ -18,7 +18,7 @@ final favoriteRecipeIdsProvider = FutureProvider<Set<int>>((ref) async {
   }
 
   final repo = ref.watch(recipeRepositoryProvider);
-  final favoriteRecipes = await repo.getFavoriteRecipes(limit: 9999);
+  final favoriteRecipes = await repo.getFavoriteRecipes();
   return favoriteRecipes.map((r) => r.id!).toSet();
 });
 

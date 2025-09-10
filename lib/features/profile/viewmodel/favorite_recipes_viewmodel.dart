@@ -8,31 +8,29 @@ import 'package:receitas_do_guaxininho/main.dart';
 class FavoriteRecipesState {
   final bool isLoading;
   final String? error;
-  final List<Recipe> recipes;
-  final int page;
-  final bool hasMore;
+  // Mapa para armazenar receitas por categoria
+  final Map<String, List<Recipe>> categorizedRecipes;
+  // Lista ordenada de categorias para construir a UI
+  final List<String> categories;
 
   const FavoriteRecipesState({
     this.isLoading = false,
     this.error,
-    this.recipes = const [],
-    this.page = 0,
-    this.hasMore = true,
+    this.categorizedRecipes = const {},
+    this.categories = const [],
   });
 
   FavoriteRecipesState copyWith({
     bool? isLoading,
     String? error,
-    List<Recipe>? recipes,
-    int? page,
-    bool? hasMore,
+    Map<String, List<Recipe>>? categorizedRecipes,
+    List<String>? categories,
   }) {
     return FavoriteRecipesState(
       isLoading: isLoading ?? this.isLoading,
       error: error == '' ? null : (error ?? this.error),
-      recipes: recipes ?? this.recipes,
-      page: page ?? this.page,
-      hasMore: hasMore ?? this.hasMore,
+      categorizedRecipes: categorizedRecipes ?? this.categorizedRecipes,
+      categories: categories ?? this.categories,
     );
   }
 }
@@ -40,29 +38,37 @@ class FavoriteRecipesState {
 // -------------------- VIEWMODEL --------------------
 class FavoriteRecipesViewModel extends StateNotifier<FavoriteRecipesState> {
   final Ref ref;
-  static const _pageSize = 10;
 
   FavoriteRecipesViewModel(this.ref) : super(const FavoriteRecipesState());
 
-  Future<void> loadInitial() async {
-    if (state.recipes.isEmpty) {
-      await loadPage(0);
-    }
-  }
-
-  Future<void> loadPage(int page) async {
-    if (page < 0) return;
+  Future<void> loadFavorites() async {
+    if (state.categorizedRecipes.isNotEmpty && !state.isLoading) return;
 
     state = state.copyWith(isLoading: true, error: '');
     try {
       final repo = ref.read(recipeRepositoryProvider);
-      final newRecipes = await repo.getFavoriteRecipes(page: page, limit: _pageSize);
+      final favoriteRecipes = await repo.getFavoriteRecipes();
+
+      if (favoriteRecipes.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          categorizedRecipes: {},
+          categories: [],
+        );
+        return;
+      }
+
+      final newCategorizedRecipes = <String, List<Recipe>>{};
+      for (final recipe in favoriteRecipes) {
+        (newCategorizedRecipes[recipe.category] ??= []).add(recipe);
+      }
+
+      final newCategories = newCategorizedRecipes.keys.toList()..sort();
 
       state = state.copyWith(
         isLoading: false,
-        recipes: newRecipes,
-        page: page,
-        hasMore: newRecipes.length == _pageSize,
+        categorizedRecipes: newCategorizedRecipes,
+        categories: newCategories,
         error: '',
       );
     } catch (e) {
@@ -73,8 +79,10 @@ class FavoriteRecipesViewModel extends StateNotifier<FavoriteRecipesState> {
 
 // -------------------- PROVIDER --------------------
 final favoriteRecipesViewModelProvider =
-StateNotifierProvider<FavoriteRecipesViewModel, FavoriteRecipesState>((ref) {
-  ref.watch(authStateProvider);
-  return FavoriteRecipesViewModel(ref)..loadInitial();
-});
-
+    StateNotifierProvider.autoDispose<
+      FavoriteRecipesViewModel,
+      FavoriteRecipesState
+    >((ref) {
+      ref.watch(authStateProvider);
+      return FavoriteRecipesViewModel(ref)..loadFavorites();
+    });

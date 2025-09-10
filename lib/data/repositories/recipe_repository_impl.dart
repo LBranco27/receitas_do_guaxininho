@@ -9,7 +9,7 @@ class RecipeRepositoryImpl implements RecipeRepository {
 
   @override
   Future<List<Recipe>> getAll({String? search, String? category}) =>
-      ds.getAll(search: search, category: category); // <- FIX
+      ds.getAll(search: search, category: category);
 
   @override
   Future<List> getFromCategory(String category) => ds.getFromCategory(category);
@@ -36,12 +36,11 @@ class RecipeRepositoryImpl implements RecipeRepository {
   Future<void> removeFavorite(int recipeId) => ds.removeFavorite(recipeId);
 
   @override
-  Future<List<Recipe>> getFavoriteRecipes({int page = 0, int limit = 10}) =>
-      ds.getFavoriteRecipes();
+  Future<List<Recipe>> getFavoriteRecipes() => ds.getFavoriteRecipes();
 
   @override
   Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10}) =>
-      ds.getMyRecipes();
+      ds.getMyRecipes(page: page, limit: limit);
 
   @override
   Future<List<Recipe>> getUserRecipes({
@@ -52,5 +51,4 @@ class RecipeRepositoryImpl implements RecipeRepository {
 
   @override
   Future<List<Recipe>> getPopularRecipes({int limit = 10}) => ds.getPopularRecipes(limit: limit);
-
 }

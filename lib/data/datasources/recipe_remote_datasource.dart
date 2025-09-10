@@ -172,31 +172,31 @@ class RecipeRemoteDataSource {
         .match({'user_id': userId, 'recipe_id': recipeId});
   }
 
-  Future<List<Recipe>> getFavoriteRecipes(
-      {int page = 0, int limit = 10}) async {
+  Future<List<Recipe>> getFavoriteRecipes() async {
     final userId = _supabaseClient.auth.currentUser?.id;
     if (userId == null) throw 'Usuário não autenticado';
 
-    final from = page * limit;
-    final to = from + limit - 1;
+    try {
+      // Chamada única via RPC para buscar todas as receitas favoritas
+      final response = await _supabaseClient.rpc(
+        'get_user_favorite_recipes',
+        params: {'p_user_id': userId},
+      );
 
-    final favoriteRelations = await _supabaseClient
-        .from('user_favorites')
-        .select('recipe_id')
-        .eq('user_id', userId)
-        .order('created_at', ascending: false)
-        .range(from, to);
+      // O retorno do RPC já é uma lista de objetos de receita
+      final recipes = (response as List)
+          .map<Recipe>((data) => Recipe.fromMap(data))
+          .toList();
 
-    final recipeIds =
-    favoriteRelations.map((fav) => fav['recipe_id'] as int).toList();
-    if (recipeIds.isEmpty) return [];
+      return recipes.map((r) => r.copyWith(isFavorite: true)).toList();
 
-    final response =
-    await _supabaseClient.from('recipes').select().inFilter('id', recipeIds);
-
-    final recipes = response.map<Recipe>((data) => Recipe.fromMap(data)).toList();
-
-    return recipes.map((r) => r.copyWith(isFavorite: true)).toList();
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print('[RecipeRemoteDataSource.getFavoriteRecipes Supabase Error] $e');
+        print('[RecipeRemoteDataSource.getFavoriteRecipes Supabase StackTrace] $stackTrace');
+      }
+      throw Exception('Failed to fetch favorite recipes: $e');
+    }
   }
 
   Future<List<Recipe>> getMyRecipes({int page = 0, int limit = 10}) async {
