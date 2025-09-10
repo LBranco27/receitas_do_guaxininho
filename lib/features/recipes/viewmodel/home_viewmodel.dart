@@ -5,6 +5,7 @@ import '../../../data/repositories/recipe_repository_impl.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../domain/repositories/recipe_repository.dart';
 import '../../profile/viewmodel/favorite_recipes_viewmodel.dart';
+import 'categories_source.dart';
 
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
   return RecipeRepositoryImpl(RecipeRemoteDataSource());
@@ -74,7 +75,8 @@ class HomeViewModel extends StateNotifier<HomeState> {
   Future<void> load() async {
     state = state.copyWith(loading: true, error: '');
     try {
-      final allCats = ref.read(categoriesProvider);
+      // Categorias dinâmicas conforme a flag global (all vs official)
+      final allCats = await ref.read(categoriesProvider.future);
       state = state.copyWith(allAvailableCategories: allCats);
 
       final results = await Future.wait([
@@ -87,19 +89,18 @@ class HomeViewModel extends StateNotifier<HomeState> {
       final recipesRaw = results[1] as List<Recipe>;
       final favoriteIds = results[2] as Set<int>;
 
-      final popularRecipes = popularRecipesRaw.map((recipe) {
-        return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
-      }).toList();
+      final popularRecipes = popularRecipesRaw
+          .map((r) => r.copyWith(isFavorite: favoriteIds.contains(r.id)))
+          .toList();
 
-      final recipes = recipesRaw.map((recipe) {
-        return recipe.copyWith(isFavorite: favoriteIds.contains(recipe.id));
-      }).toList();
+      final recipes = recipesRaw
+          .map((r) => r.copyWith(isFavorite: favoriteIds.contains(r.id)))
+          .toList();
 
       final newCategorizedRecipes = <String, List<Recipe>>{};
       for (final recipe in recipes) {
         (newCategorizedRecipes[recipe.category] ??= []).add(recipe);
       }
-
       final newCategories = newCategorizedRecipes.keys.toList()..sort();
 
       state = state.copyWith(
@@ -149,12 +150,14 @@ class HomeViewModel extends StateNotifier<HomeState> {
 
 // -------------------- PROVIDER --------------------
 final homeVmProvider = StateNotifierProvider<HomeViewModel, HomeState>((ref) {
+  // Reage à troca de usuário logado
   ref.watch(authStateProvider);
 
   final repo = ref.watch(recipeRepositoryProvider);
   final vm = HomeViewModel(repo, ref);
   vm.load();
 
+  // Mantém favoritos sincronizados
   ref.listen(favoriteRecipeIdsProvider, (previous, next) {
     if (next.hasValue) {
       vm.updateFavoritesState(next.value!);
@@ -164,35 +167,29 @@ final homeVmProvider = StateNotifierProvider<HomeViewModel, HomeState>((ref) {
   return vm;
 });
 
-// O provider agora é síncrono и retorna uma lista fixa de categorias.
-final categoriesProvider = Provider<List<String>>((ref) {
-  return [
-    'Acompanhamentos',
-    'Árabe',
-    'Aperitivos',
-    'Arroz e Risotos',
-    'Aves',
-    'Bebidas',
-    'Bolos e Tortas',
-    'Brasileira',
-    'Carnes',
-    'Churrasco',
-    'Fitness',
-    'Frutos do Mar',
-    'Italiana',
-    'Japonesa',
-    'Chinesa',
-    'Lanches',
-    'Massas',
-    'Mexicana',
-    'Molhos',
-    'Pães',
-    'Peixes',
-    'Rápida e Fácil',
-    'Saladas',
-    'Sopas',
-    'Sobremesas',
-    'Vegana',
-    'Vegetariana',
-  ]..sort();
+/// - Se kCategoriesMode == all: retorna TODAS as categorias encontradas.
+/// - Se kCategoriesMode == official: interseção com kOfficialCategories.
+final categoriesProvider = FutureProvider<List<String>>((ref) async {
+  final repo = ref.watch(recipeRepositoryProvider);
+
+  final allRecipes = await repo.getAll();
+
+  final set = <String>{};
+  for (final r in allRecipes) {
+    var c = r.category.trim();
+    if (c.isEmpty) continue;
+
+    if (c.toLowerCase() == 'sobremesa') c = 'Sobremesas';
+
+    set.add(c);
+  }
+
+  List<String> result = set.toList();
+
+  if (kCategoriesMode == CategoriesMode.official) {
+    result = result.where((c) => kOfficialCategories.contains(c)).toList();
+  }
+
+  result.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  return result;
 });

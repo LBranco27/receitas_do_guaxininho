@@ -21,6 +21,9 @@ class RecipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String? _finalImage =
+    (imagePath == null || imagePath!.trim().isEmpty) ? null : imagePath!.trim();
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -36,17 +39,19 @@ class RecipeCard extends StatelessWidget {
               aspectRatio: 16 / 9,
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: imagePath == null
+                child: _finalImage == null
                     ? const ColoredBox(color: Color(0x11000000))
                     : Image.network(
-                  imagePath!,
+                  _finalImage,
                   fit: BoxFit.cover,
+                  gaplessPlayback: true,
                   loadingBuilder: (context, child, progress) {
                     if (progress == null) return child;
                     return Center(
                       child: CircularProgressIndicator(
                         value: progress.expectedTotalBytes != null
-                            ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                            ? progress.cumulativeBytesLoaded /
+                            progress.expectedTotalBytes!
                             : null,
                       ),
                     );

@@ -10,7 +10,6 @@ class FavoriteRecipesState {
   final String? error;
   // Mapa para armazenar receitas por categoria
   final Map<String, List<Recipe>> categorizedRecipes;
-  // Lista ordenada de categorias para construir a UI
   final List<String> categories;
 
   const FavoriteRecipesState({

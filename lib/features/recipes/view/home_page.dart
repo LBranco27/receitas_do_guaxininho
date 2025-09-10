@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:receitas_do_guaxininho/shared/image_utils.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../auth/viewmodel/login_viewmodel.dart';
 import '../../auth/viewmodel/profile_providers.dart';
@@ -23,7 +24,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Adiciona um listener para mostrar/esconder o botão 'X'
     _searchController.addListener(() {
       setState(() {
         _showClearButton = _searchController.text.isNotEmpty;
@@ -64,8 +64,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   customBorder: const CircleBorder(),
                   child: CircleAvatar(
                     backgroundColor: Colors.grey.shade300,
-                    backgroundImage:
-                    avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                    backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
                     child: avatarUrl == null
                         ? const Icon(Icons.person, color: Colors.grey)
                         : null,
@@ -165,11 +164,12 @@ class _HomePageState extends ConsumerState<HomePage> {
               onRefresh: vm.refresh,
               child: ListView.builder(
                 padding: const EdgeInsets.only(bottom: 12),
-                itemCount: state.categories.length + (state.popularRecipes.isNotEmpty ? 1 : 0),
+                itemCount: state.categories.length +
+                    (state.popularRecipes.isNotEmpty ? 1 : 0),
                 itemBuilder: (_, index) {
                   final hasPopulars = state.popularRecipes.isNotEmpty;
 
-                  // Se for o primeiro item e houver receitas populares, exibe o carrossel delas.
+                  // Carrossel de populares no topo
                   if (hasPopulars && index == 0) {
                     return _CategoryCarousel(
                       category: 'Populares',
@@ -177,11 +177,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                     );
                   }
 
-                  // Para os itens seguintes, ajusta o índice para pegar da lista de categorias.
+                  // Demais categorias
                   final categoryIndex = hasPopulars ? index - 1 : index;
                   final category = state.categories[categoryIndex];
-                  final recipes =
-                  state.categorizedRecipes[category]!;
+                  final recipes = state.categorizedRecipes[category]!;
                   return _CategoryCarousel(
                     category: category,
                     recipes: recipes,
@@ -227,13 +226,17 @@ class _CategoryCarousel extends ConsumerWidget {
             itemCount: recipes.length,
             itemBuilder: (context, index) {
               final r = recipes[index];
+
+              // Resolve para URL http(s) ou null (placeholder)
+              final resolvedUrl = resolveRecipeImageUrl(r.imagePath);
+
               return Container(
                 width: 180,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 child: RecipeCard(
                   title: r.name,
                   subtitle: '${r.timeMinutes} min • ${r.servings} pessoas',
-                  imagePath: r.imagePath,
+                  imagePath: resolvedUrl,
                   favorite: r.isFavorite,
                   onTap: () => context.push('/recipe/${r.id}'),
                   onFavoriteToggle: () {
@@ -286,8 +289,7 @@ class _CategoryChips extends StatelessWidget {
       child: ActionChip(
         label: Text(label),
         onPressed: () => onCategorySelected(label),
-        backgroundColor:
-        Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+        backgroundColor: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
         side: BorderSide(
           color: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
         ),
